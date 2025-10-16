@@ -9,7 +9,7 @@ if __name__ == "__main__":
     print("=== Warehouse AI — Step 1: Readers via Engine ===")
 
     # 1) Ρυθμίσεις
-    excel_path = Path(r"C:\Users\chron\Desktop\products.xlsx")  # <-- βάλε το δικό σου
+    excel_path = Path(r"C:\Users\CHRONOPOULOS\Desktop\ΦΙΛΤΡΑ\ΦΙΛΤΡΑ.xlsx")  # <-- βάλε το δικό σου
 
     # 2) Δημιουργία engine
     eng = Engine(EngineConfig(excel_path=None, sheet=0, preview_rows=10))
@@ -32,3 +32,7 @@ if __name__ == "__main__":
     print(f"\n💾 Αποθηκεύτηκε: {out.resolve()}")
 
     print("\n✅ Τέλος — στάδιο Readers έτοιμο.")
+    
+    # 7) (προαιρετικό) Export Corpus σε JSONL
+    out_corpus = eng.export_corpus("corpus.jsonl")
+    print(f"\n💾 Αποθηκεύτηκε: {out_corpus.resolve()}")

@@ -2,7 +2,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Optional
-from warehouse_ai.readers import ExcelReader
+from warehouse_ai.data import ExcelReader
+from warehouse_ai.corpus import SimpleCorpusBuilder
 
 @dataclass
 class EngineConfig:
@@ -49,4 +50,11 @@ class Engine:
     def export_rows(self, out_path: str | Path = "rows.jsonl") -> Path:
         if not self.rows:
             raise RuntimeError("Δεν υπάρχουν rows. Κάλεσε πρώτα load().")
-        return self.reader.export_jsonl(self.rows, Path(out_path))
+        return self.reader.export_rows_jsonl(self.rows, Path(out_path))
+    
+    def export_corpus(self, out_path: str | Path = "corpus.jsonl") -> Path:
+        if not self.rows:
+            raise RuntimeError("Δεν υπάρχουν rows. Κάλεσε πρώτα load().")
+        builder = SimpleCorpusBuilder()
+        builder.build(self.rows)
+        return builder.export_corpus_jsonl(out_path)

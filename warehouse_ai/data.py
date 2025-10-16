@@ -40,7 +40,7 @@ class ExcelReader:
             lines.append(f"[{i:02d}] " + " | ".join(parts))
         return "\n".join(lines)
 
-    def export_jsonl(self, rows: List[Dict[str, str]], out_path: Path) -> Path:
+    def export_rows_jsonl(self, rows: List[Dict[str, str]], out_path: Path) -> Path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8") as f:
             for r in rows:
