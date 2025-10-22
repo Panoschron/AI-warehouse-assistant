@@ -1,8 +1,9 @@
-#AI Warehouse assistant gor high pressure hydraulic parts 
+#AI Warehouse assistant 
 
-This project aims to help a specific Mechanical engineering industry where the operator called to manufacture hudraulic hoses and combine hudraulic fittings for variable use.
+This project aims to provide solution to industries who has big or small warehouses and they need to find easier 
+their products.
 
 ##Targets
 PDF/CSV/EXCEL import of variable sources where client store his warehouse data
-Vectorizing words with different technologies like Word2Vec using the sigmoid algebra method.
+Vectorizing words and phrases with different technologies like Word2Vec using the sigmoid algebra method.
 Chat interface where client can search his warehouse and find the expected result with the highest possible accuracy
