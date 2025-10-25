@@ -42,3 +42,8 @@ if __name__ == "__main__":
     print(f"\n💾 Αποθηκεύτηκε: {out_corpus.resolve()}")
 
     print("\n✅ Τέλος — στάδιο Readers έτοιμο.")
+    
+    # 8) Export Embeddings (στο exports/embeddings/)
+    embeddings_dir = cfg.EXPORT_DIR / "embeddings"
+    out_embeddings = eng.export_embeddings(embeddings_dir)
+    print(f"\n💾 Αποθηκεύτηκαν embeddings στο: {out_embeddings.resolve()}")

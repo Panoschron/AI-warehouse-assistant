@@ -3,13 +3,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Optional
 from warehouse_ai.data import ExcelReader
-from warehouse_ai.corpus import SimpleCorpusBuilder
+from warehouse_ai.corpus import SimpleCorpusBuilder, Doc
+from warehouse_ai.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
+import app_settings
+from pathlib import Path
+
 
 @dataclass
 class EngineConfig:
     excel_path: Optional[Path] = None  # θα το ορίσεις στο run_engine.py
     sheet: int | str = 0               # ποιο φύλλο να διαβάσουμε
     preview_rows: int = 20             # πόσες γραμμές στην προεπισκόπηση
+    embedding_model: str = DEFAULT_EMBED_MODEL
+    embedding_batch_size: int = 32
 
 class Engine:
     """
@@ -21,6 +27,7 @@ class Engine:
         self.reader = ExcelReader()
         self.excel_path: Optional[Path] = cfg.excel_path
         self.rows: List[Dict[str, str]] = []
+        self.docs: List[Doc] = []
 
     # --- Setup ---
     def set_excel_path(self, path: str | Path) -> None:
@@ -58,3 +65,10 @@ class Engine:
         builder = SimpleCorpusBuilder()
         builder.build(self.rows)
         return builder.export_corpus_jsonl(out_path)
+    
+    def export_embeddings(self, out_dir: str | Path = "embeddings") -> Path:
+        emb_mgr = EmbeddingManager(self.cfg.embedding_model)
+        corpus_file = Path(app_settings.EXPORT_DIR) / "corpus.jsonl"
+        emb_mgr.encode_from_corpus_or_rows(corpus_path=corpus_file, rows=self.rows, batch_size=self.cfg.embedding_batch_size)
+        emb_mgr.save(out_dir)
+        return Path(out_dir)
