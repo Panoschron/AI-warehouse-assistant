@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+exports/
+data/
+app_settings.py

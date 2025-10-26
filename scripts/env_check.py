@@ -1,6 +1,15 @@
 from importlib import metadata
 import subprocess
 import sys
+from pathlib import Path
+import os
+
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
+
+from app_settings import REQUIREMENTS_FILE
+
 
 def read_requirements(file_path):
     """Reads a requirements file and returns a list of dependencies."""
@@ -40,8 +49,7 @@ def install_missing_packages(dependencies):
             print(f"Installing missing package: {dep}")
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', dep])
 
-if __name__ == "__main__":  # Fixed syntax
-    
-    dependencies =read_requirements('requirements.txt')
+if __name__ == "__main__":
+    dependencies = read_requirements(REQUIREMENTS_FILE)
     check_installed_packages(dependencies)
     install_missing_packages(dependencies)
