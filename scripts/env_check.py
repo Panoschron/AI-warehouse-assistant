@@ -3,11 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 import os
-
-# Add project root to Python path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.append(str(project_root))
-
 from app_settings import REQUIREMENTS_FILE
 
 

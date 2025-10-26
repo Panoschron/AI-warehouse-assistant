@@ -6,7 +6,7 @@ from warehouse_ai.data import ExcelReader
 from warehouse_ai.corpus import SimpleCorpusBuilder, Doc
 from warehouse_ai.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
 import app_settings
-from pathlib import Path
+
 
 
 @dataclass

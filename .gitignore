@@ -3,3 +3,5 @@ __pycache__/
 exports/
 data/
 app_settings.py
+*.pyc
+/warehouse_ai/__pycache__
