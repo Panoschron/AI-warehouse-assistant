@@ -2,10 +2,15 @@ import sys, os
 from pathlib import Path
 from warehouse_ai import Engine, EngineConfig 
 import app_settings as cfg
+from scripts.env_check import check_and_install_packages 
+
 
 if __name__ == "__main__":
     print("=== Warehouse AI — Step 1: Readers via Engine ===")
 
+    # Βεβαιώσου ότι όλες οι απαιτήσεις είναι ικανοποιημένες
+    success = check_and_install_packages()
+    
     # 1) Ρυθμίσεις (directory-based)
     excel_path = cfg.DATA_DIR / "products.xlsx"
 

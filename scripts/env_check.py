@@ -3,48 +3,59 @@ import subprocess
 import sys
 from pathlib import Path
 import os
+
+
+
 from app_settings import REQUIREMENTS_FILE
 
-
-def read_requirements(file_path):
-    """Reads a requirements file and returns a list of dependencies."""
-    try:
-        with open(file_path, 'r') as file:
-            requirements = [line.strip() for line in file if line.strip() and not line.startswith('#')]
-        return requirements
-    except FileNotFoundError:
-        print(f"Error: Could not find {file_path}")
-        return []
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        return []
+def check_and_install_packages(requirements_file=REQUIREMENTS_FILE):
+    """Main function to handle package dependencies check and installation"""
+    print(f"\nStarting package management process...")
     
-print("Reading dependencies from requirements.txt...")
+    # Read requirements
+    try:
+        with open(requirements_file, 'r') as file:
+            dependencies = [line.strip() for line in file if line.strip() and not line.startswith('#')]
+        if not dependencies:
+            print("No dependencies found in requirements file.")
+            return False
+    except FileNotFoundError:
+        print(f"Error: Could not find {requirements_file}")
+        return False
+    except Exception as e:
+        print(f"Error reading requirements file: {e}")
+        return False
 
-def check_installed_packages(dependencies):
-    "check if the required packages are installed"
-    print("Checking installed packages...")
-
+    print("\nChecking and installing packages...")
     for dep in dependencies:
-        pkg_name = dep.split('==')[0]  # Get package name without version
+        pkg_name = dep.split('==')[0]
+        
+        # Check if package is installed
         try:
             installed_version = metadata.version(pkg_name)
-            print(f"Package '{pkg_name}' is installed with version {installed_version}.")
+            print(f"✓ Package '{pkg_name}' is installed (version {installed_version})")
+            continue
         except metadata.PackageNotFoundError:
-            print(f"Package '{pkg_name}' is NOT installed.")
-
-def install_missing_packages(dependencies):
-    "install missing packages using pip"
-
-    for dep in dependencies:
-        pkg_name = dep.split('==')[0]  # Get package name without version
-        try:
-            metadata.version(pkg_name)
-        except metadata.PackageNotFoundError:
-            print(f"Installing missing package: {dep}")
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', dep])
+            print(f"→ Installing missing package: {dep}")
+            
+            # Install package
+            try:
+                subprocess.check_call(
+                    [sys.executable, '-m', 'pip', 'install', dep],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE
+                )
+                print(f"✓ Successfully installed {dep}")
+            except subprocess.CalledProcessError as e:
+                print(f"✗ Error installing {dep}: {e.stderr.decode()}")
+                return False
+    
+    print("\n✓ All packages are now installed and up to date!")
+    return True
 
 if __name__ == "__main__":
-    dependencies = read_requirements(REQUIREMENTS_FILE)
-    check_installed_packages(dependencies)
-    install_missing_packages(dependencies)
+    success = check_and_install_packages()
+    if not success:
+        print("\n✗ Package installation process failed")
+        sys.exit(1)
+    sys.exit(0)

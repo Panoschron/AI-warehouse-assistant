@@ -18,10 +18,7 @@ class EngineConfig:
     embedding_batch_size: int = 32
 
 class Engine:
-    """
-    Λεπτός wrapper πάνω από τον Reader (μόνο στάδιο 1).
-    Μελλοντικά θα προστεθούν corpus / embeddings / search.
-    """
+    
     def __init__(self, cfg: EngineConfig):
         self.cfg = cfg
         self.reader = ExcelReader()
@@ -72,3 +69,5 @@ class Engine:
         emb_mgr.encode_from_corpus_or_rows(corpus_path=corpus_file, rows=self.rows, batch_size=self.cfg.embedding_batch_size)
         emb_mgr.save(out_dir)
         return Path(out_dir)
+
+
