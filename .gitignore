@@ -2,7 +2,7 @@
 __pycache__/
 backend/__pycache__/
 backend/storage/*
-
+backend/app_settings.py
 app_settings.py
 *.pyc
 
