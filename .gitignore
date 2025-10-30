@@ -1,7 +1,8 @@
 .venv/
 __pycache__/
-exports/
-data/
+backend/__pycache__/
+backend/storage/*
+
 app_settings.py
 *.pyc
-/warehouse_ai/__pycache__
+

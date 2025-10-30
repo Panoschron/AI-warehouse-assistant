@@ -1,8 +1,8 @@
 import sys, os
 from pathlib import Path
-from warehouse_ai import Engine, EngineConfig 
-import app_settings as cfg
-from scripts.env_check import check_and_install_packages 
+from backend.core.engine import Engine, EngineConfig
+import backend.app_settings as cfg
+from backend.scripts.env_check import check_and_install_packages 
 
 
 if __name__ == "__main__":

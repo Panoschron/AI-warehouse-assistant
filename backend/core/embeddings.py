@@ -1,12 +1,11 @@
-# warehouse_ai/embeddings.py
+# backend/core/embeddings.py
 from pathlib import Path
 from typing import List, Dict, Optional
 import json
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from warehouse_ai.corpus import SimpleCorpusBuilder, Doc
-
-DEFAULT_EMBED_MODEL = "intfloat/multilingual-e5-large"
+from backend.data.corpus import SimpleCorpusBuilder, Doc
+from backend.app_settings import DEFAULT_EMBEDDING_MODEL
 
 
 class EmbeddingManager:
@@ -14,7 +13,7 @@ class EmbeddingManager:
     Encode a list of Doc objects and save embeddings + metadata.
     Optional: build a FAISS index if faiss is installed.
     """
-    def __init__(self, model_name: str = DEFAULT_EMBED_MODEL):
+    def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
         self.model_name = model_name
         self.model = SentenceTransformer(model_name)
         self.docs: List = []

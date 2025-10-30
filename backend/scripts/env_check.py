@@ -3,10 +3,9 @@ import subprocess
 import sys
 from pathlib import Path
 import os
+from backend.app_settings import REQUIREMENTS_FILE
 
 
-
-from app_settings import REQUIREMENTS_FILE
 
 def check_and_install_packages(requirements_file=REQUIREMENTS_FILE):
     """Main function to handle package dependencies check and installation"""

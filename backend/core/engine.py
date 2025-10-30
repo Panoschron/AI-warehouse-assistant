@@ -1,11 +1,12 @@
-# warehouse_ai/engine.py
+# core/engine.py
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Optional
-from warehouse_ai.data import ExcelReader
-from warehouse_ai.corpus import SimpleCorpusBuilder, Doc
-from warehouse_ai.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
-import app_settings
+
+from backend.data.reader  import ExcelReader
+from backend.data.corpus import  SimpleCorpusBuilder, Doc
+from backend.core.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
+import backend.app_settings as app_settings
 
 
 
@@ -66,7 +67,11 @@ class Engine:
     def export_embeddings(self, out_dir: str | Path = "embeddings") -> Path:
         emb_mgr = EmbeddingManager(self.cfg.embedding_model)
         corpus_file = Path(app_settings.EXPORT_DIR) / "corpus.jsonl"
-        emb_mgr.encode_from_corpus_or_rows(corpus_path=corpus_file, rows=self.rows, batch_size=self.cfg.embedding_batch_size)
+        emb_mgr.encode_from_corpus_or_rows(
+            corpus_path=corpus_file,
+            rows=self.rows,
+            batch_size=self.cfg.embedding_batch_size
+        )
         emb_mgr.save(out_dir)
         return Path(out_dir)
 
