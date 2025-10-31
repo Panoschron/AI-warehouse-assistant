@@ -1,9 +1,12 @@
+from importlib.resources import path
 from backend import app_settings 
 from typing import List, Dict, Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
 model = SentenceTransformer(app_settings.DEFAULT_EMBEDDING_MODEL)
 import faiss 
+import json
+from pathlib import Path
 
 
 
@@ -21,27 +24,45 @@ def vectorize_query(model, normalized_query_text: str) -> List:
 
     print(f"Vectorizing query using model: {model}")
     sentence_model = model 
-    query_embedding = sentence_model.encode(
+    query_vector = sentence_model.encode(
         normalized_query_text,
         convert_to_numpy=True,
         normalize_embeddings=True
     )
 
-    return query_embedding
+    return query_vector
 
 def search_index(index_faiss, query_vector: List, top_k:int =5) -> List[int]:
     """Search the FAISS index with the query vector and return top_k results."""
 
     print(f"Searching index with top_k={top_k}")
 
-    D = """  Distances of the nearest neighbors between the query and indexed vectors """
-    I = """ Indices of the nearest neighbors """
-
-    D, I = index_faiss.search(np.array([query_vector]), top_k)
+    # D = """  Distances of the nearest neighbors between the query and indexed vectors """
+    # I = """ Indices of the nearest neighbors """
+    
+    query_matrix = np.array([query_vector], dtype="float32")
+    D, I = index_faiss.search(query_matrix, top_k)
 
     print(f"Search results indices: {I[0]}")
     print(f"Search results distances: {D[0]}")
-    return I[0].tolist()
+    return D[0].tolist(), I[0].tolist()
+    
+
+
+
+
+def get_results(distances: List[float], indices: List[int], path_metadata: Path) -> List[Dict]:
+    """Retrieve results from metadata based on distances and indices."""
+
+    meta_entries: List[Dict] = []
+    with open(path_metadata, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+
+        
 
 
 
@@ -50,11 +71,11 @@ if __name__ == "__main__":
     normalized_query = process_query(sample_query)
     query_vector = vectorize_query(model, normalized_query)
     print(f"Query Vector: {query_vector}")
-    path_index = (str(app_settings.FAIS_INDEX_FILE))
+    path_index = (str(app_settings.FAISS_INDEX_FILE))
     print(f"Loading FAISS index from: {path_index}")
     index_faiss = faiss.read_index(path_index)
-    top_k_indices = search_index(index_faiss, query_vector, top_k=5)
-    print(f"Top K Indices: {top_k_indices}")
+    distances, indices = search_index(index_faiss, query_vector, top_k=5)
+    path_metadata = app_settings.EMBEDDINGS_METADATA
 
 
 

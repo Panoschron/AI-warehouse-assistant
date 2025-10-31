@@ -6,7 +6,7 @@ import faiss
 
 from backend.data.reader  import ExcelReader
 from backend.data.corpus import  SimpleCorpusBuilder, Doc
-from backend.core.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
+from backend.core.embeddings import EmbeddingManager, DEFAULT_EMBEDDING_MODEL
 import backend.app_settings as app_settings
 from backend.core.query_processor  import process_query, vectorize_query, model
 
@@ -16,7 +16,7 @@ class EngineConfig:
     excel_path: Optional[Path] = None  # θα το ορίσεις στο run_engine.py
     sheet: int | str = 0               # ποιο φύλλο να διαβάσουμε
     preview_rows: int = 20             # πόσες γραμμές στην προεπισκόπηση
-    embedding_model: str = DEFAULT_EMBED_MODEL
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
     embedding_batch_size: int = 32
 
 class Engine:
@@ -27,7 +27,7 @@ class Engine:
         self.excel_path: Optional[Path] = cfg.excel_path
         self.rows: List[Dict[str, str]] = []
         self.docs: List[Doc] = []
-        self.index = faiss.read_index(app_settings.FAIS_INDEX_FILE)
+        self.index = faiss.read_index(str(app_settings.FAISS_INDEX_FILE))
 
     # --- Setup ---
     def set_excel_path(self, path: str | Path) -> None:
