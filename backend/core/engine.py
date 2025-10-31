@@ -2,12 +2,13 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Optional
+import faiss    
 
 from backend.data.reader  import ExcelReader
 from backend.data.corpus import  SimpleCorpusBuilder, Doc
 from backend.core.embeddings import EmbeddingManager, DEFAULT_EMBED_MODEL
 import backend.app_settings as app_settings
-
+from backend.core.query_processor  import process_query, vectorize_query, model
 
 
 @dataclass
@@ -26,6 +27,7 @@ class Engine:
         self.excel_path: Optional[Path] = cfg.excel_path
         self.rows: List[Dict[str, str]] = []
         self.docs: List[Doc] = []
+        self.index = faiss.read_index(app_settings.FAIS_INDEX_FILE)
 
     # --- Setup ---
     def set_excel_path(self, path: str | Path) -> None:
@@ -74,5 +76,7 @@ class Engine:
         )
         emb_mgr.save(out_dir)
         return Path(out_dir)
+    
+
 
 
