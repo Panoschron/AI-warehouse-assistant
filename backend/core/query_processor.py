@@ -60,7 +60,25 @@ def get_results(distances: List[float], indices: List[int], path_metadata: Path)
             line = line.strip()
             if not line:
                 continue
-            try:
+            # σωστό indentation εδώ
+            entry = json.loads(line)
+            meta_entries.append(entry)
+
+            
+    results : List[Dict] = []
+    for dist, idx in zip(distances, indices):
+        if idx < len(meta_entries):
+            entry = meta_entries[idx]
+            results.append(
+                {
+                    "index": idx,
+                    "distance": dist,
+                    "metadata": entry
+                }
+            )
+    return results
+
+
 
         
 
@@ -75,7 +93,9 @@ if __name__ == "__main__":
     print(f"Loading FAISS index from: {path_index}")
     index_faiss = faiss.read_index(path_index)
     distances, indices = search_index(index_faiss, query_vector, top_k=5)
-    path_metadata = app_settings.EMBEDDINGS_METADATA
+    path_metadata = app_settings.META_DATA_FILE
+    results = get_results(distances, indices, path_metadata)
+    print(f"Final Results: {results}")
 
 
 
