@@ -19,6 +19,7 @@ def process_query(query: str) -> str:
     return normalized_query_text
 
 
+
 def vectorize_query(model, normalized_query_text: str) -> List:
     """Vectorize the normalized query text using the provided model."""
 
@@ -31,6 +32,8 @@ def vectorize_query(model, normalized_query_text: str) -> List:
     )
 
     return query_vector
+
+
 
 def search_index(index_faiss, query_vector: List, top_k:int =5) -> List[int]:
     """Search the FAISS index with the query vector and return top_k results."""
@@ -47,8 +50,6 @@ def search_index(index_faiss, query_vector: List, top_k:int =5) -> List[int]:
     print(f"Search results distances: {D[0]}")
     return D[0].tolist(), I[0].tolist()
     
-
-
 
 
 def get_results(distances: List[float], indices: List[int], path_metadata: Path) -> List[Dict]:
@@ -77,10 +78,6 @@ def get_results(distances: List[float], indices: List[int], path_metadata: Path)
                 }
             )
     return results
-
-
-
-        
 
 
 

@@ -8,7 +8,7 @@ from backend.data.reader  import ExcelReader
 from backend.data.corpus import  SimpleCorpusBuilder, Doc
 from backend.core.embeddings import EmbeddingManager, DEFAULT_EMBEDDING_MODEL
 import backend.app_settings as app_settings
-from backend.core.query_processor  import process_query, vectorize_query, model
+
 
 
 @dataclass
