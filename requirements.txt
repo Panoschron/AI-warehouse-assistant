@@ -2,3 +2,6 @@ pandas
 openpyxl
 sentence-transformers
 faiss-cpu
+fastapi
+pydantic
+uvicorn
