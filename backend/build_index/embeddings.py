@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 import json
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from backend.data.corpus import SimpleCorpusBuilder, Doc
+from backend.build_index.corpus import SimpleCorpusBuilder, Doc
 from backend.app_settings import DEFAULT_EMBEDDING_MODEL
 
 

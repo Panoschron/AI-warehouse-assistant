@@ -2,7 +2,7 @@ from backend import app_settings
 from backend.core import query_processor
 from typing import List, Dict
 from pathlib import Path
-from backend.core import engine
+
 
 class QueryHandler:
 
