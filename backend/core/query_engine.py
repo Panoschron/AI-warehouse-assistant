@@ -4,7 +4,6 @@ from backend import app_settings
 from typing import List, Dict, Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
-model = SentenceTransformer(app_settings.DEFAULT_EMBEDDING_MODEL)
 import faiss 
 import json
 from pathlib import Path
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 def process_query(query: str) -> str:
     logger.info(f"Processing query: %s", query)
     normalized_query_text = query.strip().lower()
-    logger.info(f"Normalized query: %s", normalized_query_text)
+    print(f"Normalized query: {normalized_query_text}")
     return normalized_query_text
 
 
@@ -26,12 +25,14 @@ def vectorize_query(model, normalized_query_text: str) -> List:
     """Vectorize the normalized query text using the provided model."""
 
     print(f"Vectorizing query using model: {model}")
-    sentence_model = model 
+    sentence_model = model
+    print(f"Using sentence model: {sentence_model}")
     query_vector = sentence_model.encode(
         normalized_query_text,
         convert_to_numpy=True,
         normalize_embeddings=True
     )
+    print(f"Query vector: {query_vector}")
 
     return query_vector
 
@@ -74,6 +75,8 @@ def get_results_from_entries(distances: List[float], indices: List[int], meta_en
             entry = meta_entries[idx]
             results.append({"index": idx, "distance": dist, "metadata": entry})
     return results
+
+
 
 
 
