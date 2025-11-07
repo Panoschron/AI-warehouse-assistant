@@ -28,12 +28,30 @@ uvicorn backend.server:app --reload --host 127.0.0.1 --port 8000
 
 ### Query the API (PowerShell)
 
-```
-curl.exe -s -H "Content-Type: application/json" -d "{\"query\":\"Liebherr\",\"top_k\":5}" http://127.0.0.1:8000/query
-```
 
-You can also check health:
-
-```
+# Health check (GET)
 Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/health"
-```
+
+# Query (POST) using PowerShell objects (safer quoting)
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:8000/query" `
+  -ContentType "application/json" `
+  -Body (@{ query = "Liebherr"; top_k = 5 } | ConvertTo-Json)
+
+# Alternatively, using curl.exe (Windows curl wrapper)
+curl.exe -s -H "Content-Type: application/json" `
+  -d "{\"query\":\"Liebherr\",\"top_k\":5}" `
+  http://127.0.0.1:8000/query
+
+
+### Query the API (Linux)
+
+
+# Health check (GET)
+curl -s http://127.0.0.1:8000/health
+
+# Query (POST)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"Liebherr","top_k":5}' \
+  http://127.0.0.1:8000/query | jq
+
