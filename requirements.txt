@@ -5,3 +5,4 @@ faiss-cpu
 fastapi
 pydantic
 uvicorn
+openai

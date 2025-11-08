@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 import faiss 
 import json
 from pathlib import Path
-
+import openai 
 
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,15 @@ def get_results_from_entries(distances: List[float], indices: List[int], meta_en
     return results
 
 
+def prompt_to_llm(results: List[Dict], query: str) -> str:
+    """Format the results and query into a prompt for LLM."""
+    context = "\n".join([f"- {res['metadata']['text']}" for res in results])
+    prompt = f"Using the following context:\n{context}\nAnswer the query: {query}"
+    return prompt
 
+def query_llm(prompt: str) -> str:
+    """Placeholder function to query an LLM with the prompt."""
+    
 
 
 if __name__ == "__main__":
