@@ -47,6 +47,9 @@ def search_index(index_faiss, query_vector: List, top_k:int =5) -> List[int]:
     # I = """ Indices of the nearest neighbors """
     
     query_matrix = np.array([query_vector], dtype="float32")
+    #We reshape the query vector to be a 2D array because this is what FAISS expects.
+
+
     D, I = index_faiss.search(query_matrix, top_k)
 
     print(f"Search results indices: {I[0]}")
