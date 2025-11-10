@@ -1,6 +1,9 @@
 import logging
 from importlib.resources import path
-from backend import app_settings 
+
+from click import prompt
+from backend import app_settings
+from backend.clients import openai_client
 from typing import List, Dict, Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -82,14 +85,18 @@ def get_results_from_entries(distances: List[float], indices: List[int], meta_en
 
 def prompt_to_llm(results: List[Dict], query: str) -> str:
     """Format the results and query into a prompt for LLM."""
-    context = "\n".join([f"- {res['metadata']['text']}" for res in results])
+    context = results 
     prompt = f"Using the following context:\n{context}\nAnswer the query: {query}"
+    print(f"Formatted prompt: {prompt[:50]}...")
+
     return prompt
 
 def query_llm(prompt: str) -> str:
-    """Placeholder function to query an LLM with the prompt."""
-    
-
+    """Placeholder function to query the LLM and return a natural language response."""
+    print(f"Querying LLM with prompt: {prompt[:50]}...")
+    response = openai_client.generate_response(prompt)
+    print(f"LLM response: {response}")
+    return response
 
 if __name__ == "__main__":
     sample_query = "Ρακόρ 1/2 αρσενικό με ουρά 1/2"

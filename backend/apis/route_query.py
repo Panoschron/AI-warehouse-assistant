@@ -15,7 +15,7 @@ class QueryRequest(BaseModel):
 #NOTE: Basemodel is an object that automatically validates the input data and generates JSON schema for the request and response bodies.
 
 class QueryResponse(BaseModel):
-    results: List[Dict]
+    natural_language_response: str
 
 @router.post("/query", response_model=QueryResponse)
 def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
@@ -28,8 +28,8 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
         raise HTTPException(status_code=503, detail="Query handler not initialized")
 
     try:
-        results = handler.handle_query(payload.query, top_k=payload.top_k)
-        return QueryResponse(results=results)
+        natural_language_response = handler.handle_query(payload.query, top_k=payload.top_k)
+        return QueryResponse(natural_language_response=natural_language_response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

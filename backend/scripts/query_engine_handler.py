@@ -24,4 +24,7 @@ class QueryHandler:
         query_vector = query_engine.vectorize_query(self.model, normalized_query)
         distances, indices = query_engine.search_index(self.index_faiss, query_vector, top_k=top_k)
         results = query_engine.get_results_from_entries(distances, indices, self.meta_entries)
-        return results
+        prompt = query_engine.prompt_to_llm(results, query)
+        natural_language_response = query_engine.query_llm(prompt)
+
+        return natural_language_response
