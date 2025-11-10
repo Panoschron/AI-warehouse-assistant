@@ -1,35 +1,58 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, List, Optional
-from pydantic import BaseModel, Field
-
-from backend.scripts.query_engine_handler import QueryHandler
+from pydantic import BaseModel
 
 router = APIRouter()
-#NOTE: APIRouter is used to create modular route handlers that can be included in the main FastAPI application.
 
 
 class QueryRequest(BaseModel):
-    query: str  
-    top_k: int 
+    query: str
+    top_k: int = 5
+    natural_language: bool = True  # Default to NL response
 
-#NOTE: Basemodel is an object that automatically validates the input data and generates JSON schema for the request and response bodies.
+
+class SearchResult(BaseModel):
+    index: int
+    similarity: float
+    metadata: Dict
+
 
 class QueryResponse(BaseModel):
-    natural_language_response: str
+    results: List[SearchResult]
+    natural_language_response: Optional[str] = None
+
 
 @router.post("/query", response_model=QueryResponse)
 def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
-    handler: Optional[QueryHandler] = getattr(request.app.state, "handler", None)
-    #NOTE: getattr is a function that retrieves an attribute from an object, if the constructor fails or didnt run on time it returns the default value (None here).
-    # In this case, it retrieves the "handler" attribute from the app's state, which is expected to be an instance of QueryHandler initialized during the app's startup event.
-    # If the handler is not initialized (i.e., None), it raises a 503 HTTPException indicating that the service is unavailable.
+    """Query the warehouse with optional natural language response."""
     
-    if handler is None:
-        raise HTTPException(status_code=503, detail="Query handler not initialized")
-
+    pipeline = getattr(request.app.state, "pipeline", None)
+    
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Query pipeline not initialized")
+    
     try:
-        natural_language_response = handler.handle_query(payload.query, top_k=payload.top_k)
-        return QueryResponse(natural_language_response=natural_language_response)
+        if payload.natural_language:
+            # Full pipeline with LLM
+            response = pipeline.search_with_llm(
+                query=payload.query,
+                top_k=payload.top_k
+            )
+            return QueryResponse(**response)
+        else:
+            # Just search, no LLM
+            results = pipeline.search(
+                query=payload.query,
+                top_k=payload.top_k
+            )
+            return QueryResponse(results=results)
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+@router.get("/health")
+def health_check():
+    """Health check endpoint."""
+    return {"status": "ok", "service": "AI Warehouse Assistant"}
+

@@ -98,18 +98,6 @@ def query_llm(prompt: str) -> str:
     print(f"LLM response: {response}")
     return response
 
-if __name__ == "__main__":
-    sample_query = "Ρακόρ 1/2 αρσενικό με ουρά 1/2"
-    normalized_query = process_query(sample_query)
-    query_vector = vectorize_query(model, normalized_query)
-    print(f"Query Vector: {query_vector}")
-    path_index = (str(app_settings.FAISS_INDEX_FILE))
-    print(f"Loading FAISS index from: {path_index}")
-    index_faiss = faiss.read_index(path_index)
-    distances, indices = search_index(index_faiss, query_vector, top_k=5)
-    path_metadata = app_settings.META_DATA_FILE
-    results = get_results_from_entries(distances, indices, path_metadata)
-    print(f"Final Results: {results}")
 
 
 

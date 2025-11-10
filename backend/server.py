@@ -26,24 +26,41 @@ app.include_router(route_query.router, prefix="", tags=["query"])
 
 @app.on_event("startup")
 def startup_event() -> None:
-    """Load heavy resources once on startup: model, FAISS index, metadata path."""
-
-    # TODO: Install packages method improvement
-
-    check_and_install_packages()
-
-
-
+    """Load heavy resources once on startup."""
+    #check_and_install_packages()
+    
+    # Load model and index
     model = SentenceTransformer(app_settings.DEFAULT_EMBEDDING_MODEL)
-    index_path = app_settings.FAISS_INDEX_FILE
-    metadata_path = app_settings.META_DATA_FILE
-    if not index_path.exists():
-        raise RuntimeError(f"FAISS index not found at {index_path}. Build the index first.")
-    if not metadata_path.exists():
-        raise RuntimeError(f"Metadata file not found at {metadata_path}. Build the index first.")
-    index = faiss.read_index(str(index_path))
-    meta_entries = query_engine.load_metadata(metadata_path)
-    app.state.handler = QueryHandler(model=model, index_faiss=index, meta_entries=meta_entries)
+    index = faiss.read_index(str(app_settings.FAISS_INDEX_FILE))
+    
+    # Load metadata
+    from backend.core.query_engine import load_metadata
+    meta_entries = load_metadata(app_settings.META_DATA_FILE)
+    
+    # Build pipeline components
+    from backend.core.retrieval.query_processor import QueryProcessor
+    from backend.core.retrieval.vector_search import VectorSearchEngine
+    from backend.core.retrieval.result_formatter import ResultFormatter
+    from backend.core.generation.prompt_builder import PromptBuilder
+    from backend.clients.openai_client import OpenAIClient
+    from backend.core.pipeline import QueryPipeline
+    
+    query_processor = QueryProcessor()
+    search_engine = VectorSearchEngine(model=model, index=index)
+    result_formatter = ResultFormatter(metadata_entries=meta_entries)
+    prompt_builder = PromptBuilder(max_context_items=3)
+    llm_client = OpenAIClient()
+    
+    # Create pipeline
+    pipeline = QueryPipeline(
+        query_processor=query_processor,
+        search_engine=search_engine,
+        result_formatter=result_formatter,
+        prompt_builder=prompt_builder,
+        llm_client=llm_client
+    )
+    
+    app.state.pipeline = pipeline
 
 
 @app.get("/health")
