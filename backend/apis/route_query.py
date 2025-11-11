@@ -18,7 +18,6 @@ class SearchResult(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    results: List[SearchResult]
     natural_language_response: Optional[str] = None
 
 
@@ -39,13 +38,7 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
                 top_k=payload.top_k
             )
             return QueryResponse(**response)
-        else:
-            # Just search, no LLM
-            results = pipeline.search(
-                query=payload.query,
-                top_k=payload.top_k
-            )
-            return QueryResponse(results=results)
+
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
