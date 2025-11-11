@@ -19,6 +19,7 @@ class SearchResult(BaseModel):
 
 class QueryResponse(BaseModel):
     natural_language_response: Optional[str] = None
+    output_text: Optional[str] = None
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -38,6 +39,7 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
                 top_k=payload.top_k
             )
             return QueryResponse(**response)
+        
 
             
     except Exception as e:

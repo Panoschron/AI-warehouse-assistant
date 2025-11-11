@@ -115,7 +115,7 @@ class IndexBuilder:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build vector index (rows -> corpus -> embeddings -> FAISS)")
-    p.add_argument("--excel", type=str, default=str(cfg.DATA_DIR / "products.xlsx"), help="Path to Excel file")
+    p.add_argument("--excel", type=str, default=str(cfg.DATA_DIR / "BigBasket_products.csv"), help="Path to Excel file")
     p.add_argument("--sheet", type=str, default="0", help="Sheet index or name (default: 0)")
     p.add_argument("--preview-rows", type=int, default=10, help="Preview first N rows")
     p.add_argument("--out-dir", type=str, default=str(cfg.EXPORT_DIR / "embeddings"), help="Output dir for embeddings/index")

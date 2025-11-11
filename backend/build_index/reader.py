@@ -21,11 +21,19 @@ def _norm_val(v) -> Optional[str]:
 class ExcelReader:
     """ΟΛΗ η λογική ανάγνωσης/προεπισκόπησης/εξαγωγής Excel."""
     def list_sheets(self, path: Path) -> List[str]:
+        """Επιστρέφει λίστα sheets για Excel. Για CSV επιστρέφει κενή λίστα ή default."""
+        if path.suffix.lower() == '.csv':
+            return []  # Τα CSV δεν έχουν sheets
         xl = pd.ExcelFile(path)
         return list(xl.sheet_names)
 
     def read_from_path(self, path: Path, sheet: int | str = 0) -> List[Dict[str, str]]:
-        df = pd.read_excel(path, sheet_name=sheet, dtype=str)
+        """Διαβάζει Excel ή CSV αρχείο ανάλογα με την κατάληξη."""
+        if path.suffix.lower() == '.csv':
+            df = pd.read_csv(path, dtype=str)
+        else:
+            df = pd.read_excel(path, sheet_name=sheet, dtype=str)
+        
         df.columns = [_clean_col(c) for c in df.columns]
         rows: List[Dict[str, str]] = []
         for _, r in df.iterrows():

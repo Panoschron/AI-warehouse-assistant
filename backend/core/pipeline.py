@@ -63,6 +63,7 @@ class QueryPipeline:
         Args:
             query: User query
             top_k: Number of results for context
+            temperature: LLM sampling temperature
             
         Returns:
             Dict with results and natural_language_response

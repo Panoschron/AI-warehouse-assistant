@@ -7,8 +7,8 @@ class PromptBuilder:
     
     def __init__(
         self, 
-        system_prompt: str = "Είσαι ένας έξυπνος βοηθός αποθήκης.",
-        max_context_items: int = 3
+        system_prompt: str = "Είσαι ένας έξυπνος βοηθός αποθήκης και πρέπει να βοηθήσεις τον εργαζόμενο να εντοπίσει ή να βρει πληροφορίες για αυτό που ψάχνει.",
+        max_context_items: int = 5
     ):
         self.system_prompt = system_prompt
         self.max_context_items = max_context_items
@@ -36,6 +36,7 @@ class PromptBuilder:
             item_text = " | ".join(fields)
             context_items.append(f"{i}. {item_text}")
         
+
         return "\n".join(context_items)
     
     def build_prompt(self, query: str, results: List[Dict]) -> str:
