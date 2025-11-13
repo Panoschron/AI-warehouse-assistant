@@ -36,7 +36,7 @@ class PromptBuilder:
             item_text = " | ".join(fields)
             context_items.append(f"{i}. {item_text}")
         
-
+        print(f"Built context: {context_items}")
         return "\n".join(context_items)
     
     def build_prompt(self, query: str, results: List[Dict]) -> str:

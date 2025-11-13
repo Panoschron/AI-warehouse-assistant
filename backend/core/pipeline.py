@@ -85,6 +85,4 @@ class QueryPipeline:
             system_prompt=system_prompt,
         )
         
-        return {
-            "natural_language_response": nl_response
-        }
+        return nl_response

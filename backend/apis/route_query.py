@@ -8,18 +8,15 @@ router = APIRouter()
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
-    natural_language: bool = True  # Default to NL response
 
 
 class SearchResult(BaseModel):
     index: int
-    similarity: float
     metadata: Dict
 
 
 class QueryResponse(BaseModel):
-    natural_language_response: Optional[str] = None
-    output_text: Optional[str] = None
+    nl_response: Optional[str] = None
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -32,13 +29,12 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
         raise HTTPException(status_code=503, detail="Query pipeline not initialized")
     
     try:
-        if payload.natural_language:
-            # Full pipeline with LLM
+
             response = pipeline.search_with_llm(
                 query=payload.query,
                 top_k=payload.top_k
             )
-            return QueryResponse(**response)
+            return QueryResponse(nl_response=response)
         
 
             
