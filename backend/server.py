@@ -42,7 +42,7 @@ def startup_event() -> None:
     query_processor = QueryProcessor()
     search_engine = VectorSearchEngine(model=model, index=index)
     result_formatter = ResultFormatter(metadata_entries=meta_entries)
-    prompt_builder = PromptBuilder(max_context_items=3)
+    prompt_builder = PromptBuilder()
     llm_client = OpenAIClient()
 
     pipeline = QueryPipeline(

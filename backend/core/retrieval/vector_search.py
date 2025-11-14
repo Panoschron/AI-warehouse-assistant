@@ -4,6 +4,7 @@ import numpy as np
 import faiss
 from typing import Tuple, List
 from sentence_transformers import SentenceTransformer
+from backend import app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,12 @@ class VectorSearchEngine:
         logger.debug(f"Embedded query to {embedding.shape} vector")
         return embedding
     
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> Tuple[List[float], List[int]]:
+    def search(self, query_vector: np.ndarray, top_k: int) -> Tuple[List[float], List[int]]:
         """Search FAISS index for nearest neighbors.
         
         Args:
             query_vector: Query embedding
-            top_k: Number of results to return
+            top_k: Number of results to return (resolved at API layer)
             
         Returns:
             Tuple of (distances, indices)
@@ -49,6 +50,7 @@ class VectorSearchEngine:
         query_vector = query_vector.astype('float32')
         
         distances, indices = self.index.search(query_vector, top_k)
+        print(f"Search results distances: {distances}, indices: {indices}")
         
         logger.debug(f"Found {len(indices[0])} results")
         return distances[0].tolist(), indices[0].tolist()

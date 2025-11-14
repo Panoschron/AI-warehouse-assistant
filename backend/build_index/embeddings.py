@@ -103,7 +103,12 @@ class EmbeddingManager:
         # save metadata (id + original metadata) as jsonl
         with (out_dir / "metadata.jsonl").open("w", encoding="utf-8") as f:
             for d in self.docs:
-                f.write(json.dumps({"id": d.id, "metadata": d.metadata}, ensure_ascii=False) + "\n")
+                f.write(json.dumps(
+                    
+                    {"id": d.id, 
+                    "metadata": d.metadata}, 
+                    ensure_ascii=False) + "\n")
+                
         print(f"✓ Saved metadata.jsonl ({len(self.docs)} entries)")
 
         # try to build and save faiss index (best-effort)

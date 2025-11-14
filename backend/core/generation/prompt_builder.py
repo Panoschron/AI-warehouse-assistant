@@ -1,4 +1,8 @@
-"""Build prompts for LLM from search results."""
+"""Build prompts for LLM from search results.
+
+Note: The number of context items is not controlled here.
+Pass in the already-trimmed results list (e.g., length == top_k).
+"""
 from typing import List, Dict
 
 
@@ -6,12 +10,10 @@ class PromptBuilder:
     """Constructs prompts for LLM queries."""
     
     def __init__(
-        self, 
+        self,
         system_prompt: str = "Είσαι ένας έξυπνος βοηθός αποθήκης και πρέπει να βοηθήσεις τον εργαζόμενο να εντοπίσει ή να βρει πληροφορίες για αυτό που ψάχνει.",
-        max_context_items: int = 5
     ):
         self.system_prompt = system_prompt
-        self.max_context_items = max_context_items
     
     def build_context(self, results: List[Dict]) -> str:
         """Extract and format context from search results.
@@ -24,7 +26,7 @@ class PromptBuilder:
         """
         context_items = []
         
-        for i, result in enumerate(results[:self.max_context_items], 1):
+        for i, result in enumerate(results, 1):
             metadata = result.get('metadata', {}).get('metadata', {})
             
             # Format each field
@@ -63,7 +65,6 @@ class PromptBuilder:
 Απάντησε στην ερώτηση: "{query}"
 
 Οδηγίες:
-- Δώσε σύντομη και χρήσιμη απάντηση στα Ελληνικά
 - Αναφέρε συγκεκριμένα προϊόντα όταν είναι σχετικά
 - Αν χρειάζεται, πρότεινε εναλλακτικές
 - Μην εφευρίσκεις πληροφορίες που δεν υπάρχουν στο context"""

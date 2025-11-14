@@ -14,15 +14,14 @@ export default function ChatPage() {
   // για να δείχνουμε error αν κάτι πάει στραβά
   const [error, setError] = useState<string>("");
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
+  async function doSend() {
     if (!input.trim() || loading) return;
 
     const question = input.trim();
     setLoading(true);
     setError("");
-    setAnswer(""); // καθάρισε παλιά απάντηση
-    setLastQuestion(question); // κράτα τι ρώτησε ο χρήστης
+    setAnswer("");
+    setLastQuestion(question);
     setInput("");
 
     try {
@@ -33,8 +32,7 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: question,
-            top_k: 5,
-            natural_language: true, // ΔΕΝ το πειράζω, όπως το είχες
+            top_k: null, // send null so backend uses its default
           }),
         }
       );
@@ -55,6 +53,11 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    await doSend();
   }
 
   return (
@@ -359,6 +362,12 @@ export default function ChatPage() {
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void doSend();
+              }
+            }}
             rows={2}
             placeholder="Γράψε την ερώτησή σου εδώ..."
             style={{

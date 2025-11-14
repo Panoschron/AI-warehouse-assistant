@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, List, Optional
 from pydantic import BaseModel
+from backend import app_settings
 
 router = APIRouter()
 
 
 class QueryRequest(BaseModel):
     query: str
-    top_k: int = 5
+    top_k: Optional[int] = None
 
 
 class SearchResult(BaseModel):
@@ -29,11 +30,14 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
         raise HTTPException(status_code=503, detail="Query pipeline not initialized")
     
     try:
+            # Resolve top_k once here; downstream inherits this value
+            effective_top_k = payload.top_k if payload.top_k is not None else app_settings.DEFAULT_TOP_K
 
             response = pipeline.search_with_llm(
                 query=payload.query,
-                top_k=payload.top_k
+                top_k=effective_top_k
             )
+            
             return QueryResponse(nl_response=response)
         
 

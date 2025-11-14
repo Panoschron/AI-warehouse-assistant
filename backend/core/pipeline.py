@@ -1,6 +1,7 @@
 """Query processing pipeline orchestration."""
 from typing import List, Dict, Optional
 import logging
+from backend import app_settings
 
 from backend.core.retrieval.query_processor import QueryProcessor
 from backend.core.retrieval.vector_search import VectorSearchEngine
@@ -28,12 +29,12 @@ class QueryPipeline:
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
     
-    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+    def search(self, query: str, top_k: int) -> List[Dict]:
         """Execute search and return structured results.
         
         Args:
             query: User query
-            top_k: Number of results
+            top_k: Number of results (resolved at API layer)
             
         Returns:
             List of search results
@@ -54,15 +55,15 @@ class QueryPipeline:
         return results
     
     def search_with_llm(
-        self, 
-        query: str, 
-        top_k: int = 5,
+        self,
+        query: str,
+        top_k: int,
     ) -> Dict:
         """Execute search and generate natural language response.
         
         Args:
             query: User query
-            top_k: Number of results for context
+            top_k: Number of results for context (resolved at API layer)
             temperature: LLM sampling temperature
             
         Returns:
