@@ -32,24 +32,27 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: question,
-            top_k: null, // send null so backend uses its default
+            top_k: null // ή βάλε αριθμό
           }),
         }
       );
 
+      let data: any = null;
+      try { data = await res.json(); } catch { /* ignore */ }
+
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const detail = data?.detail;
+        throw new Error(detail ?? `HTTP ${res.status}`);
       }
 
-      const data = await res.json();
-
       setAnswer(
+        data.natural_language_response ??
+        data.nl_response ??
         data.answer ??
-          data.nl_response ??
-          (typeof data === "string" ? data : JSON.stringify(data, null, 2))
+        JSON.stringify(data)
       );
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(err?.message ?? "Unknown error");
     } finally {
       setLoading(false);
     }

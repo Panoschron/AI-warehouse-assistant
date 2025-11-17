@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from backend import app_settings
+import logging 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,29 +25,31 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
-    """Query the warehouse with optional natural language response."""
-    
     pipeline = getattr(request.app.state, "pipeline", None)
-    
-    if pipeline is None:
-        raise HTTPException(status_code=503, detail="Query pipeline not initialized")
-    
+
     try:
-            # Resolve top_k once here; downstream inherits this value
-            effective_top_k = payload.top_k if payload.top_k is not None else app_settings.DEFAULT_TOP_K
+        if pipeline is None:
+            logger.error("Query pipeline not initialized")
+            raise HTTPException(status_code=503, detail="Query pipeline not initialized")
 
-            response = pipeline.search_with_llm(
-                query=payload.query,
-                top_k=effective_top_k
-            )
-            
-            return QueryResponse(nl_response=response)
-        
+        effective_top_k = payload.top_k if payload.top_k is not None else app_settings.DEFAULT_TOP_K
 
-            
+        if effective_top_k <= 0:
+            raise HTTPException(status_code=400, detail="top_k must be a positive integer")
+
+        response = pipeline.search_with_llm(
+            query=payload.query,
+            top_k=effective_top_k
+        )
+        return QueryResponse(nl_response=response)
+
+    except HTTPException as he:
+        logger.exception(f"HTTP error during query processing: {he.status_code} - {he.detail}")
+        raise he
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        logger.exception("Unhandled error in query_endpoint")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/health")
 def health_check():
