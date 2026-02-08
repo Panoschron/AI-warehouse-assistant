@@ -1,6 +1,5 @@
-import os
+from contextlib import asynccontextmanager
 from typing import Dict
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,21 +8,9 @@ from backend import app_settings
 from backend.apis import route_query
 from backend.core.resource_loader import load_resources  
 
-app = FastAPI(title="AI Warehouse Assistant API", version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(route_query.router, prefix="", tags=["query"])
-
-@app.on_event("startup")
-def startup_event() -> None:
-    """Load resources and build the query pipeline."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load resources and build the query pipeline (lifespan startup)."""
     # Load heavy resources (model, FAISS index, metadata)
     model, index, meta_entries = load_resources(
         model_name=app_settings.DEFAULT_EMBEDDING_MODEL,
@@ -54,6 +41,24 @@ def startup_event() -> None:
     )
 
     app.state.pipeline = pipeline
+    yield
+
+    # Optional cleanup (not strictly required for this app)
+    # if hasattr(app.state, "pipeline"):
+    #     del app.state.pipeline
+
+
+app = FastAPI(title="AI Warehouse Assistant API", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(route_query.router, prefix="", tags=["query"])
 
 @app.get("/health")
 def health() -> Dict[str, str]:
