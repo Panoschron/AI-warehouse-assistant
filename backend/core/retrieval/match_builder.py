@@ -101,7 +101,7 @@ def _fold(text: str) -> str:
 
 
 def _tokens(text: str) -> List[str]:
-    return [tok for tok in re.findall(r"[0-9a-zα-ω]+", _fold(text)) if len(tok) >= 3]
+    return [tok for tok in re.findall(r"[0-9a-zα-ω]+", _fold(text)) if len(tok) >= 4]
 
 
 def lexical_bonus(query: str, fields: Dict[str, Any]) -> float:
@@ -111,7 +111,9 @@ def lexical_bonus(query: str, fields: Dict[str, Any]) -> float:
         return 0.0
     hay = _fold(" ".join(str(v) for v in fields.values() if v))
     hits = sum(1 for tok in tokens if tok in hay)
-    return 0.22 * (hits / len(tokens))
+    if hits == 0:
+        return 0.0
+    return 0.18 + 0.16 * (hits / len(tokens))
 
 
 def build_matches(
