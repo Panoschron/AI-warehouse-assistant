@@ -6,31 +6,32 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend import app_settings
 from backend.apis import route_query
-from backend.core.resource_loader import load_resources  
+from backend.core.resource_loader import ensure_demo_index, load_resources
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load resources and build the query pipeline (lifespan startup)."""
-    # Load heavy resources (model, FAISS index, metadata)
+    ensure_demo_index()
+
     model, index, meta_entries = load_resources(
         model_name=app_settings.DEFAULT_EMBEDDING_MODEL,
         index_path=app_settings.FAISS_INDEX_FILE,
         metadata_path=app_settings.META_DATA_FILE,
     )
 
-    # Build pipeline components
-    from backend.core.retrieval.query_processor import QueryProcessor
-    from backend.core.retrieval.vector_search import VectorSearchEngine
-    from backend.core.retrieval.result_formatter import ResultFormatter
+    from backend.clients.openai_client import build_llm_client
     from backend.core.generation.prompt_builder import PromptBuilder
-    from backend.clients.openai_client import OpenAIClient
     from backend.core.pipeline import QueryPipeline
+    from backend.core.retrieval.query_processor import QueryProcessor
+    from backend.core.retrieval.result_formatter import ResultFormatter
+    from backend.core.retrieval.vector_search import VectorSearchEngine
 
     query_processor = QueryProcessor()
     search_engine = VectorSearchEngine(model=model, index=index)
     result_formatter = ResultFormatter(metadata_entries=meta_entries)
     prompt_builder = PromptBuilder()
-    llm_client = OpenAIClient()
+    llm_client = build_llm_client()
 
     pipeline = QueryPipeline(
         query_processor=query_processor,
@@ -42,10 +43,6 @@ async def lifespan(app: FastAPI):
 
     app.state.pipeline = pipeline
     yield
-
-    # Optional cleanup (not strictly required for this app)
-    # if hasattr(app.state, "pipeline"):
-    #     del app.state.pipeline
 
 
 app = FastAPI(title="AI Warehouse Assistant API", version="0.1.0", lifespan=lifespan)
@@ -60,10 +57,13 @@ app.add_middleware(
 
 app.include_router(route_query.router, prefix="", tags=["query"])
 
+
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("backend.server:app", host="127.0.0.1", port=8000, reload=True)

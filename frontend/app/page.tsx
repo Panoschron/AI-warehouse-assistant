@@ -2,27 +2,45 @@
 
 import { useState } from "react";
 
+type LocationState = "present" | "empty";
+
+type Match = {
+  code: string;
+  description: string;
+  location: string | null;
+  location_state: LocationState;
+  explain: string;
+  score?: number;
+};
+
+type QueryResponse = {
+  matches?: Match[];
+  empty?: boolean;
+  nl_response?: string;
+  natural_language_response?: string;
+  answer?: string;
+};
+
 export default function ChatPage() {
-  // τι γράφει ο χρήστης
   const [input, setInput] = useState("");
-  // τι απάντηση πήραμε από το backend (τελευταία)
   const [answer, setAnswer] = useState<string>("");
-  // τελευταία ερώτηση του χρήστη (για εμφάνιση στο chat)
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [empty, setEmpty] = useState(false);
   const [lastQuestion, setLastQuestion] = useState<string>("");
-  // loading flag για το κουμπί
   const [loading, setLoading] = useState(false);
-  // για να δείχνουμε error αν κάτι πάει στραβά
   const [error, setError] = useState<string>("");
 
-  async function doSend() {
-    if (!input.trim() || loading) return;
+  async function doSend(preset?: string) {
+    const question = (preset ?? input).trim();
+    if (!question || loading) return;
 
-    const question = input.trim();
     setLoading(true);
     setError("");
     setAnswer("");
+    setMatches([]);
+    setEmpty(false);
     setLastQuestion(question);
-    setInput("");
+    if (!preset) setInput("");
 
     try {
       const res = await fetch(
@@ -32,27 +50,35 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: question,
-            top_k: null // ή βάλε αριθμό
+            top_k: null,
           }),
         }
       );
 
-      let data: any = null;
-      try { data = await res.json(); } catch { /* ignore */ }
+      let data: QueryResponse | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        /* ignore */
+      }
 
       if (!res.ok) {
-        const detail = data?.detail;
+        const detail = (data as { detail?: string } | null)?.detail;
         throw new Error(detail ?? `HTTP ${res.status}`);
       }
 
+      const nextMatches = data?.matches ?? [];
+      setMatches(nextMatches);
+      setEmpty(Boolean(data?.empty) || nextMatches.length === 0);
       setAnswer(
-        data.natural_language_response ??
-        data.nl_response ??
-        data.answer ??
-        JSON.stringify(data)
+        data?.nl_response ??
+          data?.natural_language_response ??
+          data?.answer ??
+          ""
       );
-    } catch (err: any) {
-      setError(err?.message ?? "Unknown error");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -62,6 +88,8 @@ export default function ChatPage() {
     e.preventDefault();
     await doSend();
   }
+
+  const hasThread = Boolean(lastQuestion || answer || error || loading || matches.length);
 
   return (
     <main
@@ -90,7 +118,6 @@ export default function ChatPage() {
           overflow: "hidden",
         }}
       >
-        {/* HEADER */}
         <header
           style={{
             padding: "16px 20px",
@@ -138,12 +165,11 @@ export default function ChatPage() {
                 color: "#6b7280",
               }}
             >
-              Ρώτα σε φυσική γλώσσα για προϊόντα, stock, κωδικούς κτλ.
+              Κατάλογος → ταίριασμα → εξήγηση → θέση ραφιού ή κενό
             </p>
           </div>
         </header>
 
-        {/* CHAT AREA */}
         <div
           style={{
             flex: 1,
@@ -152,8 +178,7 @@ export default function ChatPage() {
             overflowY: "auto",
           }}
         >
-          {/* Αν δεν υπάρχει ακόμα ερώτηση/απάντηση, δείξε placeholder σαν ChatGPT landing */}
-          {!lastQuestion && !answer && !error && !loading && (
+          {!hasThread && (
             <div
               style={{
                 maxWidth: "520px",
@@ -173,11 +198,7 @@ export default function ChatPage() {
                 Ξεκίνα μια ερώτηση
               </h2>
               <p style={{ marginBottom: "20px" }}>
-                Π.χ.{" "}
-                <span style={{ fontStyle: "italic" }}>
-                  “Βρες μου όλα τα υδραυλικά φίλτρα για Caterpillar” ή
-                  “Ποιο είναι το stock στα λάστιχα 3/8;”
-                </span>
+                Δοκίμασε ορθογραφικό λάθος ή είδος χωρίς θέση ραφιού.
               </p>
               <div
                 style={{
@@ -187,75 +208,46 @@ export default function ChatPage() {
                   textAlign: "left",
                 }}
               >
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
+                {[
+                  ["🔎 Φίλτρο (typo)", "υδραυλικο φιλτρο"],
+                  ["📦 Χωρίς ράφι", "ρουλεμαν 6205"],
+                  ["🧠 Κενό αποτέλεσμα", "πλανητης ζευς ανταλλακτικο"],
+                ].map(([title, sample]) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    onClick={() => {
+                      setInput(sample);
+                      void doSend(sample);
+                    }}
                     style={{
-                      fontWeight: 600,
+                      padding: "10px 12px",
+                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e5e7eb",
                       fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
+                      textAlign: "left",
+                      cursor: "pointer",
                     }}
                   >
-                    🔎 Αναζήτηση προϊόντων
-                  </div>
-                  <div>“Δείξε μου όλους τους κωδικούς με ‘seal kit’ στο όνομα.”</div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
-                    }}
-                  >
-                    📦 Stock & αποθήκη
-                  </div>
-                  <div>“Τι έχουμε διαθέσιμο σε εύκαμπτες σωλήνες 1/2;”</div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
-                    }}
-                  >
-                    🧠 Περιγραφές
-                  </div>
-                  <div>“Γράψε μου περιγραφή για αυτό το προϊόν για e-shop.”</div>
-                </div>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "12px",
+                        marginBottom: "4px",
+                        color: "#111827",
+                      }}
+                    >
+                      {title}
+                    </div>
+                    <div>“{sample}”</div>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Αν υπάρχει τελευταία ερώτηση ή απάντηση, εμφάνισέ τες σαν chat */}
-          {(lastQuestion || answer || error || loading) && (
+          {hasThread && (
             <div
               style={{
                 display: "flex",
@@ -265,14 +257,8 @@ export default function ChatPage() {
                 margin: "0 auto",
               }}
             >
-              {/* Μήνυμα χρήστη */}
               {lastQuestion && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <div
                     style={{
                       maxWidth: "80%",
@@ -291,8 +277,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Μήνυμα assistant (loading / error / answer) */}
-              {(answer || error || loading) && (
+              {(answer || error || loading || empty || matches.length > 0) && (
                 <div
                   style={{
                     display: "flex",
@@ -319,13 +304,13 @@ export default function ChatPage() {
                   </div>
                   <div
                     style={{
-                      maxWidth: "80%",
+                      maxWidth: "88%",
+                      width: "100%",
                       padding: "10px 14px",
                       borderRadius: "18px",
                       backgroundColor: "#ffffff",
                       color: "#111827",
                       fontSize: "14px",
-                      whiteSpace: "pre-wrap",
                       border: "1px solid #e5e7eb",
                       boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
                       borderBottomLeftRadius: "4px",
@@ -333,17 +318,90 @@ export default function ChatPage() {
                   >
                     {loading && !answer && !error && (
                       <span style={{ color: "#6b7280" }}>
-                        Γράφω απάντηση...
+                        Ψάχνω στον κατάλογο...
                       </span>
                     )}
 
                     {!loading && error && (
-                      <span style={{ color: "#b91c1c" }}>
-                        Error: {error}
-                      </span>
+                      <span style={{ color: "#b91c1c" }}>Error: {error}</span>
                     )}
 
-                    {!loading && !error && answer && <>{answer}</>}
+                    {!loading && !error && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        {answer && (
+                          <div style={{ whiteSpace: "pre-wrap" }}>{answer}</div>
+                        )}
+
+                        {empty && matches.length === 0 && (
+                          <div
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: "10px",
+                              backgroundColor: "#f8fafc",
+                              border: "1px dashed #cbd5e1",
+                              color: "#475569",
+                            }}
+                          >
+                            Δεν βρέθηκαν σχετικά είδη στον κατάλογο.
+                          </div>
+                        )}
+
+                        {matches.map((match) => (
+                          <article
+                            key={`${match.code}-${match.location ?? "none"}`}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: "10px",
+                              border: "1px solid #e5e7eb",
+                              backgroundColor: "#f8fafc",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: "8px",
+                                alignItems: "baseline",
+                              }}
+                            >
+                              <strong style={{ color: "#111827" }}>{match.code}</strong>
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  color:
+                                    match.location_state === "present"
+                                      ? "#166534"
+                                      : "#92400e",
+                                  backgroundColor:
+                                    match.location_state === "present"
+                                      ? "#dcfce7"
+                                      : "#fef3c7",
+                                  borderRadius: "999px",
+                                  padding: "2px 8px",
+                                }}
+                              >
+                                {match.location_state === "present"
+                                  ? `Ράφι ${match.location}`
+                                  : "Χωρίς θέση στο κατάλογο"}
+                              </span>
+                            </div>
+                            <div style={{ marginTop: "4px", color: "#374151" }}>
+                              {match.description}
+                            </div>
+                            <div
+                              style={{
+                                marginTop: "8px",
+                                color: "#4b5563",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {match.explain}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -351,7 +409,6 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* INPUT BAR */}
         <form
           onSubmit={handleSend}
           style={{
