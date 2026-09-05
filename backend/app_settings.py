@@ -23,7 +23,7 @@ DEFAULT_TOP_K = int(os.environ.get("DEFAULT_TOP_K", "5"))
 
 # Cosine / inner-product floor for a "real" match. FAISS always returns k neighbors;
 # below this, treat the hit as noise so empty-state queries stay empty.
-MIN_MATCH_SCORE = float(os.environ.get("MIN_MATCH_SCORE", "0.30"))
+MIN_MATCH_SCORE = float(os.environ.get("MIN_MATCH_SCORE", "0.40"))
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPEN_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")

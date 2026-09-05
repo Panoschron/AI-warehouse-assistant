@@ -30,19 +30,22 @@ class QueryPipeline:
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
 
-    def search(self, query: str, top_k: int) -> List[Dict]:
-        """Execute search and return structured results."""
+    def search(self, query: str, top_k: int) -> tuple[List[Dict], str]:
+        """Execute search and return (candidate results, processed query)."""
         logger.info(f"Processing search query: {query}")
 
         processed_query = self.query_processor.process(query)
 
+        ntotal = int(getattr(self.search_engine.index, "ntotal", top_k) or top_k)
+        candidate_k = min(ntotal, max(top_k * 4, 12))
+
         query_vector = self.search_engine.embed_query(processed_query)
-        distances, indices = self.search_engine.search(query_vector, top_k=top_k)
+        distances, indices = self.search_engine.search(query_vector, top_k=candidate_k)
 
         results = self.result_formatter.format_results(distances, indices)
 
-        logger.info(f"Found {len(results)} results")
-        return results
+        logger.info(f"Found {len(results)} candidate results")
+        return results, processed_query
 
     def search_with_llm(
         self,
@@ -52,10 +55,10 @@ class QueryPipeline:
         """Retrieve matches, attach grounded explains, optionally add nl_response."""
         logger.info(f"Processing query: {query}")
 
-        results = self.search(query, top_k=top_k)
+        results, processed_query = self.search(query, top_k=top_k)
         matches = attach_explains(
             query=query,
-            matches=build_matches(results),
+            matches=build_matches(results, query=processed_query)[:top_k],
             prompt_builder=self.prompt_builder,
             llm_client=self.llm_client,
         )

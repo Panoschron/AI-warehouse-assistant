@@ -12,6 +12,7 @@ from backend.core.generation.explain import (
 )
 from backend.core.generation.prompt_builder import PromptBuilder
 from backend.core.retrieval.match_builder import build_matches, catalog_fields, resolve_location
+from backend.core.retrieval.query_processor import QueryProcessor
 
 
 class MatchBuilderTests(unittest.TestCase):
@@ -61,6 +62,18 @@ class MatchBuilderTests(unittest.TestCase):
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0]["code"], "10.01.00101")
         self.assertEqual(matches[0]["location_state"], "present")
+
+    def test_lexical_bonus_promotes_misspelled_code(self):
+        from backend.core.retrieval.match_builder import lexical_bonus
+
+        bearing = {"code": "10.05.00501", "description": "Ρουλεμάν 6205-2RS"}
+        other = {"code": "10.09.00901", "description": "Ράβδος γείωσης M12"}
+        self.assertGreater(lexical_bonus("ρουλεμαν 6205", bearing), lexical_bonus("ρουλεμαν 6205", other))
+        self.assertGreater(lexical_bonus("ρουλεμαν 6205", bearing), 0)
+
+    def test_query_processor_expands_rakor_alias(self):
+        processed = QueryProcessor().process("rakor")
+        self.assertIn("ρακόρ", processed)
 
 
 class ExplainTests(unittest.TestCase):

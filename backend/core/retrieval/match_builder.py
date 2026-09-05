@@ -1,6 +1,8 @@
 """Map retrieved catalog rows onto the locked /query match contract."""
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from backend import app_settings
@@ -93,9 +95,29 @@ def _score_from_result(result: Dict[str, Any]) -> Optional[float]:
         return None
 
 
+def _fold(text: str) -> str:
+    normalized = unicodedata.normalize("NFD", text or "")
+    return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn").lower()
+
+
+def _tokens(text: str) -> List[str]:
+    return [tok for tok in re.findall(r"[0-9a-zα-ω]+", _fold(text)) if len(tok) >= 3]
+
+
+def lexical_bonus(query: str, fields: Dict[str, Any]) -> float:
+    """Boost rows that share folded tokens with the query (misspellings / codes)."""
+    tokens = _tokens(query)
+    if not tokens:
+        return 0.0
+    hay = _fold(" ".join(str(v) for v in fields.values() if v))
+    hits = sum(1 for tok in tokens if tok in hay)
+    return 0.22 * (hits / len(tokens))
+
+
 def build_matches(
     results: List[Dict[str, Any]],
     min_score: Optional[float] = None,
+    query: str = "",
 ) -> List[Dict[str, Any]]:
     """Turn formatter rows into contract matches (explain is filled later)."""
     threshold = app_settings.MIN_MATCH_SCORE if min_score is None else min_score
@@ -105,6 +127,8 @@ def build_matches(
         entry = result.get("metadata") if isinstance(result.get("metadata"), dict) else result
         fields = catalog_fields(entry or {})
         score = _score_from_result(result)
+        if score is not None:
+            score = score + lexical_bonus(query, fields)
         if score is not None and score < threshold:
             continue
 
@@ -123,4 +147,5 @@ def build_matches(
             match["score"] = round(score, 4)
         matches.append(match)
 
+    matches.sort(key=lambda item: item.get("score") or 0.0, reverse=True)
     return matches
