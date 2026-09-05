@@ -40,7 +40,7 @@ Explain is grounded only in matched catalog fields. With `OPENAI_API_KEY` set, t
    - Retrieves top-k relevant items from FAISS using prebuilt embeddings and metadata.
    - Builds structured `matches` (code, description, location/empty, grounded `explain`).
    - Optionally adds `nl_response` (LLM if configured, otherwise a template).
-4) Backend returns the locked contract (`matches`, `empty`, optional `nl_response`). The Next.js chat still reads `nl_response`; match-list UX is a frontend follow-up.
+4) Backend returns the locked contract (`matches`, `empty`, optional `nl_response`). The Next.js chat renders per-match `explain` + shelf/empty; `nl_response` is an optional summary bubble.
 
 ## Prerequisites
 
@@ -132,7 +132,7 @@ npm run dev
 
 7) Test the chat UI
 - Type a query (e.g. `υδραυλικο φιλτρο`, `rakor`, or a product code).
-- The UI calls POST /query and currently shows `nl_response`. Structured `matches` are available on the same response for the frontend follow-up.
+- The UI calls POST /query and lists each match (code, description, explain, shelf or «χωρίς ράφι»). Empty catalog results show a dedicated empty state.
 
 ## API
 
@@ -165,7 +165,7 @@ npm run dev
     - No matches → `matches: []`, `empty: true`
     - Missing shelf → `location: null`, `location_state: "empty"` (never invented)
     - `explain` is required on every match and is grounded in catalog fields only
-    - `nl_response` stays optional for the existing chat UI
+    - `nl_response` is optional (short summary bubble in the chat UI)
   - Errors:
     - 400 Bad Request: empty query or top_k <= 0
     - 503 Service Unavailable: when pipeline is not initialized
@@ -214,7 +214,7 @@ curl -s -H 'Content-Type: application/json' \
 
 - Running frontend
   - Ensure NEXT_PUBLIC_API_URL points to your FastAPI host:port.
-  - The chat page currently reads `nl_response`. `matches` / `empty` are on the same `/query` response.
+  - The chat page renders `matches` / `empty` / `explain` / location. `nl_response` is an optional summary.
 
 - Error handling and logs
   - 400 responses include detail explaining the validation issue (e.g., top_k must be a positive integer).
