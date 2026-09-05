@@ -1,8 +1,12 @@
 .venv/
 __pycache__/
 backend/__pycache__/
+# Generated index artifacts — rebuild from the sample catalog CSV
 backend/storage/*
-backend/app_settings.py
-app_settings.py
+!backend/storage/samples/
+!backend/storage/samples/**
 *.pyc
+.env
+.env.local
+frontend/.env.local
 

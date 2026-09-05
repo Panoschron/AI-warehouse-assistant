@@ -38,7 +38,13 @@ class SimpleCorpusBuilder:
       # Βήμα 1: επανάληψη σε κάθε γραμμή
       for i, row in enumerate(rows):
         text = "|".join(f"{k}: {v}" for k, v in row.items())
-        doc_id = row.get("Κωδικός", f"row-{i}")
+        doc_id = (
+            row.get("code")
+            or row.get("Κωδικός")
+            or row.get("κωδικός")
+            or row.get("item_code")
+            or f"row-{i}"
+        )
         doc = Doc(id=doc_id, text=text, metadata=row)
         docs.append(doc)
       self.docs = docs

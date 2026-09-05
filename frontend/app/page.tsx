@@ -1,18 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import {
+  API_BASE,
+  isCatalogEmpty,
+  parseQueryResponse,
+  type MatchItem,
+  type QueryResponse,
+} from "@/lib/query";
+
+const LOCATION_EMPTY_COPY = "χωρίς ράφι / δεν υπάρχει τοποθεσία";
+const CATALOG_EMPTY_COPY =
+  "Δεν βρέθηκαν σχετικά είδη στον κατάλογο. Δεν εφευρίσκονται προδιαγραφές ή θέσεις.";
 
 export default function ChatPage() {
-  // τι γράφει ο χρήστης
   const [input, setInput] = useState("");
-  // τι απάντηση πήραμε από το backend (τελευταία)
-  const [answer, setAnswer] = useState<string>("");
-  // τελευταία ερώτηση του χρήστη (για εμφάνιση στο chat)
-  const [lastQuestion, setLastQuestion] = useState<string>("");
-  // loading flag για το κουμπί
+  const [lastQuestion, setLastQuestion] = useState("");
+  const [result, setResult] = useState<QueryResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  // για να δείχνουμε error αν κάτι πάει στραβά
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
 
   async function doSend() {
     if (!input.trim() || loading) return;
@@ -20,39 +26,38 @@ export default function ChatPage() {
     const question = input.trim();
     setLoading(true);
     setError("");
-    setAnswer("");
+    setResult(null);
     setLastQuestion(question);
     setInput("");
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/query`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: question,
-            top_k: null // ή βάλε αριθμό
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE}/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: question }),
+      });
 
-      let data: any = null;
-      try { data = await res.json(); } catch { /* ignore */ }
+      let data: unknown = null;
+      try {
+        data = await res.json();
+      } catch {
+        /* ignore non-JSON */
+      }
 
       if (!res.ok) {
-        const detail = data?.detail;
+        const detail =
+          data &&
+          typeof data === "object" &&
+          "detail" in data &&
+          typeof data.detail === "string"
+            ? data.detail
+            : null;
         throw new Error(detail ?? `HTTP ${res.status}`);
       }
 
-      setAnswer(
-        data.natural_language_response ??
-        data.nl_response ??
-        data.answer ??
-        JSON.stringify(data)
-      );
-    } catch (err: any) {
-      setError(err?.message ?? "Unknown error");
+      setResult(parseQueryResponse(data));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -62,6 +67,9 @@ export default function ChatPage() {
     e.preventDefault();
     await doSend();
   }
+
+  const hasConversation = Boolean(lastQuestion || result || error || loading);
+  const emptyCatalog = result ? isCatalogEmpty(result) : false;
 
   return (
     <main
@@ -90,7 +98,6 @@ export default function ChatPage() {
           overflow: "hidden",
         }}
       >
-        {/* HEADER */}
         <header
           style={{
             padding: "16px 20px",
@@ -138,12 +145,11 @@ export default function ChatPage() {
                 color: "#6b7280",
               }}
             >
-              Ρώτα σε φυσική γλώσσα για προϊόντα, stock, κωδικούς κτλ.
+              Αναζήτηση καταλόγου: κωδικός, εξήγηση, ράφι — χωρίς εφεύρεση προδιαγραφών.
             </p>
           </div>
         </header>
 
-        {/* CHAT AREA */}
         <div
           style={{
             flex: 1,
@@ -152,127 +158,20 @@ export default function ChatPage() {
             overflowY: "auto",
           }}
         >
-          {/* Αν δεν υπάρχει ακόμα ερώτηση/απάντηση, δείξε placeholder σαν ChatGPT landing */}
-          {!lastQuestion && !answer && !error && !loading && (
-            <div
-              style={{
-                maxWidth: "520px",
-                margin: "40px auto 0 auto",
-                textAlign: "center",
-                color: "#6b7280",
-                fontSize: "14px",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "20px",
-                  marginBottom: "12px",
-                  color: "#111827",
-                }}
-              >
-                Ξεκίνα μια ερώτηση
-              </h2>
-              <p style={{ marginBottom: "20px" }}>
-                Π.χ.{" "}
-                <span style={{ fontStyle: "italic" }}>
-                  “Βρες μου όλα τα υδραυλικά φίλτρα για Caterpillar” ή
-                  “Ποιο είναι το stock στα λάστιχα 3/8;”
-                </span>
-              </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: "12px",
-                  textAlign: "left",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
-                    }}
-                  >
-                    🔎 Αναζήτηση προϊόντων
-                  </div>
-                  <div>“Δείξε μου όλους τους κωδικούς με ‘seal kit’ στο όνομα.”</div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
-                    }}
-                  >
-                    📦 Stock & αποθήκη
-                  </div>
-                  <div>“Τι έχουμε διαθέσιμο σε εύκαμπτες σωλήνες 1/2;”</div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: "12px",
-                      marginBottom: "4px",
-                      color: "#111827",
-                    }}
-                  >
-                    🧠 Περιγραφές
-                  </div>
-                  <div>“Γράψε μου περιγραφή για αυτό το προϊόν για e-shop.”</div>
-                </div>
-              </div>
-            </div>
-          )}
+          {!hasConversation && <LandingHints />}
 
-          {/* Αν υπάρχει τελευταία ερώτηση ή απάντηση, εμφάνισέ τες σαν chat */}
-          {(lastQuestion || answer || error || loading) && (
+          {hasConversation && (
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 gap: "12px",
-                maxWidth: "720px",
+                maxWidth: "760px",
                 margin: "0 auto",
               }}
             >
-              {/* Μήνυμα χρήστη */}
               {lastQuestion && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <div
                     style={{
                       maxWidth: "80%",
@@ -291,8 +190,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Μήνυμα assistant (loading / error / answer) */}
-              {(answer || error || loading) && (
+              {(loading || error || result) && (
                 <div
                   style={{
                     display: "flex",
@@ -301,49 +199,62 @@ export default function ChatPage() {
                     gap: "8px",
                   }}
                 >
+                  <Avatar />
                   <div
                     style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "999px",
-                      backgroundColor: "#e5e7eb",
+                      flex: 1,
+                      minWidth: 0,
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "14px",
-                      color: "#4b5563",
-                      flexShrink: 0,
+                      flexDirection: "column",
+                      gap: "10px",
                     }}
                   >
-                    A
-                  </div>
-                  <div
-                    style={{
-                      maxWidth: "80%",
-                      padding: "10px 14px",
-                      borderRadius: "18px",
-                      backgroundColor: "#ffffff",
-                      color: "#111827",
-                      fontSize: "14px",
-                      whiteSpace: "pre-wrap",
-                      border: "1px solid #e5e7eb",
-                      boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
-                      borderBottomLeftRadius: "4px",
-                    }}
-                  >
-                    {loading && !answer && !error && (
-                      <span style={{ color: "#6b7280" }}>
-                        Γράφω απάντηση...
-                      </span>
+                    {loading && !result && !error && (
+                      <SummaryBubble>
+                        <span style={{ color: "#6b7280" }}>
+                          Αναζητώ στον κατάλογο…
+                        </span>
+                      </SummaryBubble>
                     )}
 
                     {!loading && error && (
-                      <span style={{ color: "#b91c1c" }}>
-                        Error: {error}
-                      </span>
+                      <SummaryBubble>
+                        <span style={{ color: "#b91c1c" }}>Error: {error}</span>
+                      </SummaryBubble>
                     )}
 
-                    {!loading && !error && answer && <>{answer}</>}
+                    {!loading && !error && result && emptyCatalog && (
+                      <EmptyCatalogState
+                        message={result.nl_response || CATALOG_EMPTY_COPY}
+                      />
+                    )}
+
+                    {!loading && !error && result && !emptyCatalog && (
+                      <>
+                        {result.nl_response && (
+                          <SummaryBubble>{result.nl_response}</SummaryBubble>
+                        )}
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            color: "#4b5563",
+                            paddingLeft: "2px",
+                          }}
+                        >
+                          {result.matches.length}{" "}
+                          {result.matches.length === 1
+                            ? "αποτέλεσμα"
+                            : "αποτελέσματα"}
+                        </div>
+                        {result.matches.map((match, index) => (
+                          <MatchCard
+                            key={`${match.code || "match"}-${index}`}
+                            match={match}
+                          />
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -351,7 +262,6 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* INPUT BAR */}
         <form
           onSubmit={handleSend}
           style={{
@@ -372,7 +282,7 @@ export default function ChatPage() {
               }
             }}
             rows={2}
-            placeholder="Γράψε την ερώτησή σου εδώ..."
+            placeholder="Π.χ. υδραυλικο φιλτρο, rakor, ρουλεμαν 6205…"
             style={{
               flex: 1,
               resize: "none",
@@ -399,10 +309,243 @@ export default function ChatPage() {
               color: "#ffffff",
             }}
           >
-            {loading ? "Sending..." : "Send"}
+            {loading ? "…" : "Αποστολή"}
           </button>
         </form>
       </div>
     </main>
+  );
+}
+
+function Avatar() {
+  return (
+    <div
+      style={{
+        width: "28px",
+        height: "28px",
+        borderRadius: "999px",
+        backgroundColor: "#e5e7eb",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "14px",
+        color: "#4b5563",
+        flexShrink: 0,
+      }}
+    >
+      A
+    </div>
+  );
+}
+
+function SummaryBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: "10px 14px",
+        borderRadius: "18px",
+        backgroundColor: "#ffffff",
+        color: "#111827",
+        fontSize: "14px",
+        whiteSpace: "pre-wrap",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
+        borderBottomLeftRadius: "4px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function EmptyCatalogState({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        padding: "16px 16px 14px",
+        borderRadius: "12px",
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        color: "#78350f",
+      }}
+    >
+      <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>
+        Κενό αποτέλεσμα καταλόγου
+      </div>
+      <div style={{ fontSize: "14px", lineHeight: 1.45 }}>{message}</div>
+    </div>
+  );
+}
+
+function MatchCard({ match }: { match: MatchItem }) {
+  const shelfPresent =
+    match.location_state === "present" && Boolean(match.location);
+
+  return (
+    <article
+      style={{
+        padding: "12px 14px",
+        borderRadius: "12px",
+        backgroundColor: "#ffffff",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "6px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#1e3a8a",
+            backgroundColor: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: "6px",
+            padding: "2px 8px",
+          }}
+        >
+          {match.code || "—"}
+        </span>
+        <span style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+          {match.description || "Χωρίς περιγραφή"}
+        </span>
+      </div>
+
+      {match.explain && (
+        <p
+          style={{
+            margin: "0 0 10px",
+            fontSize: "13px",
+            lineHeight: 1.5,
+            color: "#374151",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {match.explain}
+        </p>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          fontSize: "12px",
+        }}
+      >
+        <span style={{ fontWeight: 700, color: "#6b7280" }}>Ράφι</span>
+        {shelfPresent ? (
+          <span
+            style={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontWeight: 600,
+              color: "#065f46",
+              backgroundColor: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              borderRadius: "6px",
+              padding: "2px 8px",
+            }}
+          >
+            {match.location}
+          </span>
+        ) : (
+          <span
+            style={{
+              color: "#92400e",
+              backgroundColor: "#fffbeb",
+              border: "1px solid #fde68a",
+              borderRadius: "6px",
+              padding: "2px 8px",
+            }}
+          >
+            {LOCATION_EMPTY_COPY}
+          </span>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function LandingHints() {
+  const hints = [
+    {
+      title: "🔎 Ορθογραφία / Greeklish",
+      body: "«υδραυλικο φιλτρο» ή «rakor» — ταιριάζει και με τυπογραφικά.",
+    },
+    {
+      title: "📦 Ράφι ή κενό",
+      body: "«ρουλεμαν 6205» — αν δεν υπάρχει θέση, φαίνεται ρητά.",
+    },
+    {
+      title: "🗂️ Κενός κατάλογος",
+      body: "Άσχετο ερώτημα → σαφές empty state, χωρίς εφεύρεση ειδών.",
+    },
+  ];
+
+  return (
+    <div
+      style={{
+        maxWidth: "520px",
+        margin: "40px auto 0 auto",
+        textAlign: "center",
+        color: "#6b7280",
+        fontSize: "14px",
+      }}
+    >
+      <h2
+        style={{
+          fontSize: "20px",
+          marginBottom: "12px",
+          color: "#111827",
+        }}
+      >
+        Ξεκίνα μια ερώτηση
+      </h2>
+      <p style={{ marginBottom: "20px" }}>
+        Ο βοηθός επιστρέφει κωδικό, εξήγηση από τον κατάλογο και ράφι — ποτέ
+        φανταστικές προδιαγραφές.
+      </p>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "12px",
+          textAlign: "left",
+        }}
+      >
+        {hints.map((hint) => (
+          <div
+            key={hint.title}
+            style={{
+              padding: "10px 12px",
+              borderRadius: "12px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
+              fontSize: "12px",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: "12px",
+                marginBottom: "4px",
+                color: "#111827",
+              }}
+            >
+              {hint.title}
+            </div>
+            <div>{hint.body}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

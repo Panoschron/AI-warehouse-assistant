@@ -1,8 +1,9 @@
+from typing import List, Literal, Optional
+
 from fastapi import APIRouter, HTTPException, Request
-from typing import Dict, List, Optional
 from pydantic import BaseModel
 from backend import app_settings
-import logging 
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +15,18 @@ class QueryRequest(BaseModel):
     top_k: Optional[int] = None
 
 
-class SearchResult(BaseModel):
-    index: int
-    metadata: Dict
+class MatchItem(BaseModel):
+    code: str
+    description: str
+    location: Optional[str] = None
+    location_state: Literal["present", "empty"]
+    explain: str
+    score: Optional[float] = None
 
 
 class QueryResponse(BaseModel):
+    matches: List[MatchItem]
+    empty: bool
     nl_response: Optional[str] = None
 
 
@@ -32,6 +39,9 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
             logger.error("Query pipeline not initialized")
             raise HTTPException(status_code=503, detail="Query pipeline not initialized")
 
+        if not (payload.query or "").strip():
+            raise HTTPException(status_code=400, detail="query must be a non-empty string")
+
         effective_top_k = payload.top_k if payload.top_k is not None else app_settings.DEFAULT_TOP_K
 
         if effective_top_k <= 0:
@@ -39,20 +49,24 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
 
         response = pipeline.search_with_llm(
             query=payload.query,
-            top_k=effective_top_k
+            top_k=effective_top_k,
         )
-        return QueryResponse(nl_response=response)
+        return QueryResponse(
+            matches=response.get("matches") or [],
+            empty=bool(response.get("empty")),
+            nl_response=response.get("nl_response"),
+        )
 
     except HTTPException as he:
         logger.exception(f"HTTP error during query processing: {he.status_code} - {he.detail}")
         raise he
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled error in query_endpoint")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.get("/health")
 def health_check():
     """Health check endpoint."""
     return {"status": "ok", "service": "AI Warehouse Assistant"}
-
