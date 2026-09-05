@@ -40,7 +40,7 @@ Explain is grounded only in matched catalog fields. With `OPENAI_API_KEY` set, t
    - Retrieves top-k relevant items from FAISS using prebuilt embeddings and metadata.
    - Builds structured `matches` (code, description, location/empty, grounded `explain`).
    - Optionally adds `nl_response` (LLM if configured, otherwise a template).
-4) Backend returns the locked contract; frontend renders the match list plus location/empty.
+4) Backend returns the locked contract (`matches`, `empty`, optional `nl_response`). The Next.js chat still reads `nl_response`; match-list UX is a frontend follow-up.
 
 ## Prerequisites
 
@@ -132,7 +132,7 @@ npm run dev
 
 7) Test the chat UI
 - Type a query (e.g. `υδραυλικο φιλτρο`, `rakor`, or a product code).
-- The UI calls POST /query and shows matches with explain + shelf, or an empty state.
+- The UI calls POST /query and currently shows `nl_response`. Structured `matches` are available on the same response for the frontend follow-up.
 
 ## API
 
@@ -214,7 +214,7 @@ curl -s -H 'Content-Type: application/json' \
 
 - Running frontend
   - Ensure NEXT_PUBLIC_API_URL points to your FastAPI host:port.
-  - The chat page reads `matches` (explain + location/empty) and optional `nl_response`.
+  - The chat page currently reads `nl_response`. `matches` / `empty` are on the same `/query` response.
 
 - Error handling and logs
   - 400 responses include detail explaining the validation issue (e.g., top_k must be a positive integer).
