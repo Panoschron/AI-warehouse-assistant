@@ -191,9 +191,12 @@ curl -s -H 'Content-Type: application/json' \
 curl -s -H 'Content-Type: application/json' \
   -d '{"query":"ρουλεμαν 6205","top_k":3}' \
   http://127.0.0.1:8000/query | jq
-# no relevant hits → matches [] / empty true:
+# no relevant hits → matches [] / empty true (Greek or Latin junk):
 curl -s -H 'Content-Type: application/json' \
   -d '{"query":"πλανητης ζευς ανταλλακτικο","top_k":3}' \
+  http://127.0.0.1:8000/query | jq
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"zzzznotaproduct999","top_k":3}' \
   http://127.0.0.1:8000/query | jq
 ```
 

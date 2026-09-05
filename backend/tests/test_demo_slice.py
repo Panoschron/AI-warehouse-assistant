@@ -71,6 +71,73 @@ class MatchBuilderTests(unittest.TestCase):
         self.assertGreater(lexical_bonus("ρουλεμαν 6205", bearing), lexical_bonus("ρουλεμαν 6205", other))
         self.assertGreater(lexical_bonus("ρουλεμαν 6205", bearing), 0)
 
+    def _row(self, distance: float, code: str, description: str, location: str = ""):
+        meta = {"code": code, "description": description}
+        if location:
+            meta["location"] = location
+        return {"distance": distance, "metadata": {"id": code, "metadata": meta}}
+
+    def test_latin_junk_cluster_is_empty(self):
+        """Cosine ~0.44–0.50 with no shared tokens must not become catalog hits."""
+        results = [
+            self._row(0.495, "10.09.00901", "Ράβδος γείωσης M12 γαλβανιζέ", "G-01-01"),
+            self._row(0.460, "10.10.01001", "Λιπαντικό γραναζιών ISO VG 220", "H-03-02"),
+            self._row(0.443, "10.12.01201", "Μπουλόνι 10.9 M16x80", "J-06-12"),
+        ]
+        matches = build_matches(results, query="zzzznotaproduct999")
+        self.assertEqual(matches, [])
+
+    def test_higher_latin_junk_still_empty(self):
+        results = [
+            self._row(0.647, "10.09.00901", "Ράβδος γείωσης M12 γαλβανιζέ", "G-01-01"),
+            self._row(0.612, "10.12.01201", "Μπουλόνι 10.9 M16x80", "J-06-12"),
+        ]
+        matches = build_matches(results, query="abcdefg12345")
+        self.assertEqual(matches, [])
+
+    def test_misspelling_kept_via_lexical_bonus(self):
+        results = [
+            self._row(0.489, "10.02.00212", "Εύκαμπτη υδραυλική σωλήνα 1/4"),
+            self._row(0.473, "10.01.00102", "Υδραυλικό φίλτρο αναρρόφησης 25 micron", "A-12-04"),
+            self._row(0.455, "10.01.00101", "Υδραυλικό φίλτρο επιστροφής 10 micron", "A-12-03"),
+        ]
+        matches = build_matches(results, query="υδραυλικο φιλτρο")
+        self.assertGreaterEqual(len(matches), 1)
+        codes = {m["code"] for m in matches}
+        self.assertIn("10.01.00101", codes)
+        self.assertIn("10.01.00102", codes)
+        self.assertNotIn("10.02.00212", codes)
+        self.assertEqual(matches[0]["location_state"], "present")
+
+    def test_bearing_misspelling_stays_top_with_empty_shelf(self):
+        results = [
+            self._row(0.596, "10.09.00901", "Ράβδος γείωσης M12 γαλβανιζέ", "G-01-01"),
+            self._row(0.549, "10.05.00501", "Ρουλεμάν 6205-2RS"),
+            self._row(0.536, "10.05.00502", "Ρουλεμάν 6308-2RS", "E-04-11"),
+        ]
+        matches = build_matches(results, query="ρουλεμαν 6205")
+        self.assertGreaterEqual(len(matches), 1)
+        self.assertEqual(matches[0]["code"], "10.05.00501")
+        self.assertIsNone(matches[0]["location"])
+        self.assertEqual(matches[0]["location_state"], "empty")
+        self.assertNotIn("10.09.00901", {m["code"] for m in matches})
+
+    def test_alias_hit_below_semantic_floor_still_kept(self):
+        """rakor only reaches ~0.50 after lexical bonus — must not be dropped."""
+        results = [
+            self._row(0.241, "10.03.00301", "Ρακόρ 1 inch BSP αρσενικό", "D-05-02"),
+            self._row(0.259, "10.09.00901", "Ράβδος γείωσης M12 γαλβανιζέ", "G-01-01"),
+        ]
+        matches = build_matches(results, query="rakor ρακόρ")
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["code"], "10.03.00301")
+
+    def test_strong_ungrounded_semantic_hit_kept(self):
+        results = [self._row(0.82, "10.04.00402", "Seal kit κυλίνδρου Liebherr R954", "C-01-09")]
+        matches = build_matches(results, query="zzzznotaproduct999")
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["code"], "10.04.00402")
+
     def test_query_processor_expands_rakor_alias(self):
         processed = QueryProcessor().process("rakor")
         self.assertIn("ρακόρ", processed)

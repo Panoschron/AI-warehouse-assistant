@@ -123,14 +123,16 @@ def build_matches(
 ) -> List[Dict[str, Any]]:
     """Turn formatter rows into contract matches (explain is filled later)."""
     threshold = app_settings.MIN_MATCH_SCORE if min_score is None else min_score
-    matches: List[Dict[str, Any]] = []
+    semantic_floor = app_settings.MIN_SEMANTIC_SCORE
+    gap = app_settings.RELATIVE_SCORE_GAP
+    ranked: List[Tuple[float, float, Dict[str, Any]]] = []
 
     for result in results:
         entry = result.get("metadata") if isinstance(result.get("metadata"), dict) else result
         fields = catalog_fields(entry or {})
-        score = _score_from_result(result)
-        if score is not None:
-            score = score + lexical_bonus(query, fields)
+        raw = _score_from_result(result)
+        bonus = lexical_bonus(query, fields) if query else 0.0
+        score = None if raw is None else raw + bonus
         if score is not None and score < threshold:
             continue
 
@@ -147,7 +149,24 @@ def build_matches(
         }
         if score is not None:
             match["score"] = round(score, 4)
-        matches.append(match)
+            ranked.append((score, bonus, match))
+        else:
+            ranked.append((0.0, bonus, match))
 
+    if not ranked:
+        return []
+
+    top_score = max(item[0] for item in ranked)
+    grounded = any(bonus > 0.0 for _, bonus, _ in ranked)
+    # FAISS always returns neighbors. A flat cluster with no token overlap is junk
+    # (Latin nonce strings often score 0.44–0.65 against this 30-row catalog).
+    if not grounded and top_score < semantic_floor:
+        return []
+
+    if gap >= 0:
+        floor = top_score - gap
+        ranked = [item for item in ranked if item[0] >= floor]
+
+    matches = [item[2] for item in ranked]
     matches.sort(key=lambda item: item.get("score") or 0.0, reverse=True)
     return matches
