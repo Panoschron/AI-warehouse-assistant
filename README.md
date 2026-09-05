@@ -105,6 +105,7 @@ Expected outputs:
 4) Configure settings (optional)
 - Check backend/app_settings.py for:
   - DEFAULT_TOP_K (must be > 0)
+  - MIN_MATCH_SCORE (0.40 after lexical bonus), MIN_SEMANTIC_SCORE (0.75 for ungrounded hits), RELATIVE_SCORE_GAP (0.18)
   - STORAGE paths for index/metadata
   - Embedding model name
 - Optional LLM: export OPENAI_API_KEY in the environment (never commit it). Without a key, template explains still work.
