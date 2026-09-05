@@ -105,6 +105,7 @@ Expected outputs:
 4) Configure settings (optional)
 - Check backend/app_settings.py for:
   - DEFAULT_TOP_K (must be > 0)
+  - MIN_MATCH_SCORE (0.40 after lexical bonus), MIN_SEMANTIC_SCORE (0.75 for ungrounded hits), RELATIVE_SCORE_GAP (0.18)
   - STORAGE paths for index/metadata
   - Embedding model name
 - Optional LLM: export OPENAI_API_KEY in the environment (never commit it). Without a key, template explains still work.
@@ -191,9 +192,12 @@ curl -s -H 'Content-Type: application/json' \
 curl -s -H 'Content-Type: application/json' \
   -d '{"query":"ρουλεμαν 6205","top_k":3}' \
   http://127.0.0.1:8000/query | jq
-# no relevant hits → matches [] / empty true:
+# no relevant hits → matches [] / empty true (Greek or Latin junk):
 curl -s -H 'Content-Type: application/json' \
   -d '{"query":"πλανητης ζευς ανταλλακτικο","top_k":3}' \
+  http://127.0.0.1:8000/query | jq
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"zzzznotaproduct999","top_k":3}' \
   http://127.0.0.1:8000/query | jq
 ```
 
