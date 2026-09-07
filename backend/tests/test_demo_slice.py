@@ -195,10 +195,18 @@ class ExplainTests(unittest.TestCase):
 
 class ContractTests(unittest.TestCase):
     def test_empty_response_shape(self):
-        body = QueryResponse(matches=[], empty=True, nl_response="Δεν βρέθηκαν σχετικά είδη στον κατάλογο.")
+        body = QueryResponse(
+            presentation="empty",
+            matches=[],
+            clarifying=None,
+            empty=True,
+            nl_response="Δεν βρέθηκαν σχετικά είδη στον κατάλογο.",
+        )
         dumped = body.model_dump()
         self.assertEqual(dumped["matches"], [])
         self.assertTrue(dumped["empty"])
+        self.assertEqual(dumped["presentation"], "empty")
+        self.assertIsNone(dumped["clarifying"])
         self.assertIn("nl_response", dumped)
 
     def test_match_requires_explain_and_allows_null_location(self):

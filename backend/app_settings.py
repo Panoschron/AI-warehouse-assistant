@@ -29,6 +29,10 @@ MIN_MATCH_SCORE = float(os.environ.get("MIN_MATCH_SCORE", "0.40"))
 MIN_SEMANTIC_SCORE = float(os.environ.get("MIN_SEMANTIC_SCORE", "0.75"))
 # After a real leader is found, drop also-rans this far below the top score.
 RELATIVE_SCORE_GAP = float(os.environ.get("RELATIVE_SCORE_GAP", "0.18"))
+# Presentation: #1 vs #2 gap for single vs clarifying/list.
+PRESENTATION_GAP = float(os.environ.get("PRESENTATION_GAP", "0.12"))
+# Soft family filter / column-diff look at the top-M gated matches.
+PRESENTATION_TOP_M = int(os.environ.get("PRESENTATION_TOP_M", "8"))
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPEN_AI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")

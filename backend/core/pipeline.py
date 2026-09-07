@@ -6,6 +6,11 @@ from backend.clients.base_llm_client import BaseLLMClient
 from backend.core.generation.explain import attach_explains, template_nl_response
 from backend.core.generation.prompt_builder import PromptBuilder
 from backend.core.retrieval.match_builder import build_matches
+from backend.core.retrieval.presentation import (
+    apply_constraints,
+    decide_presentation,
+    normalize_constraints,
+)
 from backend.core.retrieval.query_processor import QueryProcessor
 from backend.core.retrieval.result_formatter import ResultFormatter
 from backend.core.retrieval.vector_search import VectorSearchEngine
@@ -51,27 +56,43 @@ class QueryPipeline:
         self,
         query: str,
         top_k: int,
+        constraints: Optional[List[Dict]] = None,
     ) -> Dict:
-        """Retrieve matches, attach grounded explains, optionally add nl_response."""
+        """Retrieve matches, apply presentation policy, optionally add nl_response."""
         logger.info(f"Processing query: {query}")
 
         results, processed_query = self.search(query, top_k=top_k)
+        gated = apply_constraints(
+            build_matches(results, query=processed_query),
+            normalize_constraints(constraints),
+        )
+        decision = decide_presentation(query=query, matches=gated, top_k=top_k)
         matches = attach_explains(
             query=query,
-            matches=build_matches(results, query=processed_query)[:top_k],
+            matches=decision["matches"],
             prompt_builder=self.prompt_builder,
             llm_client=self.llm_client,
         )
 
-        if not matches:
+        presentation = decision["presentation"]
+        clarifying = decision["clarifying"]
+        empty = bool(decision["empty"] or not matches)
+
+        if empty:
             return {
+                "presentation": "empty",
                 "matches": [],
+                "clarifying": None,
                 "empty": True,
-                "nl_response": template_nl_response([]),
+                "nl_response": template_nl_response([], presentation="empty"),
             }
 
-        nl_response = template_nl_response(matches)
-        if self.llm_client and self.prompt_builder:
+        nl_response = template_nl_response(
+            matches,
+            presentation=presentation,
+            clarifying=clarifying,
+        )
+        if presentation != "clarifying" and self.llm_client and self.prompt_builder:
             try:
                 prompt = self.prompt_builder.build_prompt(query, results)
                 nl_response = self.llm_client.generate(
@@ -82,7 +103,9 @@ class QueryPipeline:
                 logger.exception("NL generation failed; using template nl_response")
 
         return {
+            "presentation": presentation,
             "matches": matches,
+            "clarifying": clarifying,
             "empty": False,
             "nl_response": nl_response,
         }
