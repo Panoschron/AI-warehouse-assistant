@@ -15,10 +15,13 @@ MISSING = "δεν υπάρχει στο κατάλογο"
 
 # Extra catalog keys we may surface when present (never invented).
 _OPTIONAL_LABELS = (
+    ("family", "Οικογένεια"),
     ("category", "Κατηγορία"),
     ("κατηγορία", "Κατηγορία"),
     ("manufacturer", "Κατασκευαστής"),
     ("κατασκευαστής", "Κατασκευαστής"),
+    ("micron", "Micron"),
+    ("diameter", "Διάμετρος"),
     ("size", "Διάσταση"),
     ("pressure", "Πίεση"),
     ("unit", "Μονάδα"),
@@ -140,11 +143,25 @@ def attach_explains(
     return annotated
 
 
-def template_nl_response(matches: List[Dict[str, Any]]) -> str:
-    if not matches:
+def template_nl_response(
+    matches: List[Dict[str, Any]],
+    presentation: Optional[str] = None,
+    clarifying: Optional[Dict[str, Any]] = None,
+) -> str:
+    if presentation == "empty" or not matches:
         return "Δεν βρέθηκαν σχετικά είδη στον κατάλογο."
+    if presentation == "clarifying" and clarifying:
+        options = clarifying.get("options") or []
+        label = clarifying.get("label") or clarifying.get("field") or ""
+        joined = ", ".join(str(opt) for opt in options)
+        return f"Χρειάζεται διευκρίνιση ({label}): {joined}."
     top = matches[0]
     loc = top.get("location") if top.get("location_state") == "present" else MISSING
+    if presentation == "single":
+        return (
+            f"1 αποτέλεσμα: {top.get('code', '')} — {top.get('description', '')} "
+            f"(θέση: {loc})."
+        )
     return (
         f"Βρέθηκαν {len(matches)} αποτελέσματα. "
         f"Κορυφαίο: {top.get('code', '')} — {top.get('description', '')} "

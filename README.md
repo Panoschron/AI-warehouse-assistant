@@ -12,6 +12,8 @@ Catalog export (synthetic SoftOne-like CSV) → semantic match (including misspe
 
 Sample catalog (committed): `backend/storage/samples/softone_warehouse_catalog.csv`
 
+Typed columns for clarifying: `family`, `micron` ∈ {5,10,25}, `diameter` ∈ {1/2", 1", 1.5"} on a real filter grid, plus `sku_key` (bearing `6205-2RS`). ~30–40% of rows have no location; 1–2 filter rows omit diameter (ERP-ugly).
+
 Rebuild the FAISS index from that CSV:
 
 ```bash
@@ -38,9 +40,10 @@ Explain is grounded only in matched catalog fields. With `OPENAI_API_KEY` set, t
 3) Backend pipeline:
    - Processes the query (normalization).
    - Retrieves top-k relevant items from FAISS using prebuilt embeddings and metadata.
-   - Builds structured `matches` (code, description, location/empty, grounded `explain`).
-   - Optionally adds `nl_response` (LLM if configured, otherwise a template).
-4) Backend returns the locked contract (`matches`, `empty`, optional `nl_response`). The Next.js chat renders per-match `explain` + shelf/empty; `nl_response` is an optional summary bubble.
+  - Builds structured `matches` (code, description, location/empty, grounded `explain`).
+  - After junk/score gates, applies presentation: `single` | `list` | `clarifying` | `empty`.
+  - Optionally adds `nl_response` (LLM if configured, otherwise a template).
+4) Backend returns the locked contract (`presentation`, `matches`, `clarifying`, `empty`, optional `nl_response`). The Next.js chat renders per-match `explain` + shelf/empty; chip UI is a frontend follow-up (`constraints` are accepted on the request).
 
 ## Prerequisites
 
@@ -105,7 +108,7 @@ Expected outputs:
 4) Configure settings (optional)
 - Check backend/app_settings.py for:
   - DEFAULT_TOP_K (must be > 0)
-  - MIN_MATCH_SCORE (0.40 after lexical bonus), MIN_SEMANTIC_SCORE (0.75 for ungrounded hits), RELATIVE_SCORE_GAP (0.18)
+  - MIN_MATCH_SCORE (0.40 after lexical bonus), MIN_SEMANTIC_SCORE (0.75 for ungrounded hits), RELATIVE_SCORE_GAP (0.18), PRESENTATION_GAP (0.12)
   - STORAGE paths for index/metadata
   - Embedding model name
 - Optional LLM: export OPENAI_API_KEY in the environment (never commit it). Without a key, template explains still work.
@@ -143,12 +146,18 @@ npm run dev
 - POST /query
   - Request body:
     ```json
-    { "query": "rakor", "top_k": 5 }
+    {
+      "query": "υδραυλικο φιλτρο",
+      "top_k": 5,
+      "constraints": [{"field": "micron", "value": "10"}]
+    }
     ```
-    - top_k is optional; when omitted, DEFAULT_TOP_K is used.
+    - `top_k` is optional; when omitted, DEFAULT_TOP_K is used.
+    - `constraints` is optional (stateless chip answers: `{field, value}[]`).
   - Response body:
     ```json
     {
+      "presentation": "single | list | clarifying | empty",
       "matches": [
         {
           "code": "string",
@@ -159,14 +168,28 @@ npm run dev
           "score": 0.0
         }
       ],
+      "clarifying": {
+        "field": "micron",
+        "label": "Micron",
+        "options": ["5", "10", "25"]
+      },
       "empty": false,
       "nl_response": "string"
     }
     ```
-    - No matches → `matches: []`, `empty: true`
+    - `presentation` is mandatory
+    - `clarifying` is `null` unless `presentation` is `clarifying`; options are real typed distinct values among the (family-restricted) top matches — never invented
+    - No matches → `presentation: "empty"`, `matches: []`, `empty: true`, `clarifying: null`
     - Missing shelf → `location: null`, `location_state: "empty"` (never invented)
     - `explain` is required on every match and is grounded in catalog fields only
     - `nl_response` is optional (short summary bubble in the chat UI)
+  - Presentation policy (after existing junk / score gates):
+    - exact catalog code (`code` / `sku_key` / `size`, e.g. `6205-2RS`) **or** (leader_ok and gap ≥ 0.12) → `single`, `matches` = [#1] only
+    - else if fewer than 2 typed `constraints` and usable column-diff (`micron` / `diameter` only) and gap < 0.12 → `clarifying`
+    - else if matches → `list` (2–5)
+    - else → `empty`
+    - Up to 2 clarifying turns (stateless resubmit). After 2 typed chips — or when no usable diff remains — settle on `single` or `list`. Unknown `constraints.field` values are dropped (whitelist = `micron` / `diameter`)
+    - Soft family filter: before column-diff, if a majority of top-M share `family`, restrict the diff to that family. Chips are only typed `micron` / `diameter` of that family — never bearing `size` / `sku_key`
   - Errors:
     - 400 Bad Request: empty query or top_k <= 0
     - 503 Service Unavailable: when pipeline is not initialized
@@ -179,27 +202,48 @@ curl -s -H 'Content-Type: application/json' \
   http://127.0.0.1:8000/query | jq
 ```
 
-### 10′ smoke test
+### Merge-gate smoke (copy-paste)
+
+Rebuild the index after catalog edits, then start the API:
 
 ```bash
 python -m backend.scripts.build_demo_index
 uvicorn backend.server:app --reload --host 127.0.0.1 --port 8000
-# misspelling still matches:
-curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"υδραυλικο φιλτρο","top_k":5}' \
-  http://127.0.0.1:8000/query | jq
-# item with no shelf → location null / empty:
-curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"ρουλεμαν 6205","top_k":3}' \
-  http://127.0.0.1:8000/query | jq
-# no relevant hits → matches [] / empty true (Greek or Latin junk):
-curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"πλανητης ζευς ανταλλακτικο","top_k":3}' \
-  http://127.0.0.1:8000/query | jq
-curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"zzzznotaproduct999","top_k":3}' \
-  http://127.0.0.1:8000/query | jq
 ```
+
+```bash
+# 1) exact code → single, one match, explain + location
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"6205-2RS"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,n:(.matches|length),match:(.matches[0]|{code,description,explain,location,location_state})}'
+
+# 2) filter query → clarifying; chips ONLY micron/diameter of family=filter (must NOT be list)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"υδραυλικο φιλτρο"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
+
+# 3a) first chip (micron) → still clarifying (remaining typed field, usually diameter)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"υδραυλικο φιλτρο","constraints":[{"field":"micron","value":"10"}]}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
+
+# 3b) both chips → single or list (2-turn cap)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"υδραυλικο φιλτρο","constraints":[{"field":"micron","value":"10"},{"field":"diameter","value":"1\""}]}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
+
+# 4) junk → empty
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"zzzznotaproduct999"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,matches,clarifying}'
+
+# 5) no cross-family chip pollution (options ⊆ {5,10,25} or {1/2",1",1.5"} — never 6205-2RS)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"υδραυλικο φιλτρο"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,field:.clarifying.field,options:.clarifying.options}'
+```
+
+Offline unit proof (no FAISS): `python -m unittest backend.tests.test_presentation backend.tests.test_demo_slice`
 
 ## Detailed procedure and tips
 

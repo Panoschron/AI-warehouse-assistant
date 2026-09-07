@@ -10,9 +10,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class Constraint(BaseModel):
+    field: str
+    value: str
+
+
 class QueryRequest(BaseModel):
     query: str
     top_k: Optional[int] = None
+    constraints: Optional[List[Constraint]] = None
 
 
 class MatchItem(BaseModel):
@@ -24,8 +30,16 @@ class MatchItem(BaseModel):
     score: Optional[float] = None
 
 
+class Clarifying(BaseModel):
+    field: str
+    label: str
+    options: List[str]
+
+
 class QueryResponse(BaseModel):
+    presentation: Literal["single", "list", "clarifying", "empty"]
     matches: List[MatchItem]
+    clarifying: Optional[Clarifying] = None
     empty: bool
     nl_response: Optional[str] = None
 
@@ -50,9 +64,12 @@ def query_endpoint(payload: QueryRequest, request: Request) -> QueryResponse:
         response = pipeline.search_with_llm(
             query=payload.query,
             top_k=effective_top_k,
+            constraints=[c.model_dump() for c in (payload.constraints or [])],
         )
         return QueryResponse(
+            presentation=response.get("presentation") or ("empty" if response.get("empty") else "list"),
             matches=response.get("matches") or [],
+            clarifying=response.get("clarifying"),
             empty=bool(response.get("empty")),
             nl_response=response.get("nl_response"),
         )
