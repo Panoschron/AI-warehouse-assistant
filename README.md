@@ -185,10 +185,10 @@ npm run dev
     - `nl_response` is optional (short summary bubble in the chat UI)
   - Presentation policy (after existing junk / score gates):
     - exact catalog code (`code` / `sku_key` / `size`, e.g. `6205-2RS`) **or** (leader_ok and gap ≥ 0.12) → `single`, `matches` = [#1] only
-    - else if no `constraints` yet and usable column-diff (`micron` / `diameter` only) and gap < 0.12 → `clarifying`
+    - else if fewer than 2 typed `constraints` and usable column-diff (`micron` / `diameter` only) and gap < 0.12 → `clarifying`
     - else if matches → `list` (2–5)
     - else → `empty`
-    - After a chip (`constraints` present): never clarifying — settle on `single` or `list` (stateless resubmit)
+    - Up to 2 clarifying turns (stateless resubmit). After 2 typed chips — or when no usable diff remains — settle on `single` or `list`. Unknown `constraints.field` values are dropped (whitelist = `micron` / `diameter`)
     - Soft family filter: before column-diff, if a majority of top-M share `family`, restrict the diff to that family. Chips are only typed `micron` / `diameter` of that family — never bearing `size` / `sku_key`
   - Errors:
     - 400 Bad Request: empty query or top_k <= 0
@@ -222,9 +222,14 @@ curl -s -H 'Content-Type: application/json' \
   -d '{"query":"υδραυλικο φιλτρο"}' \
   http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
 
-# 3) same query + chip constraint → single or list (stateless; not a second clarifying)
+# 3a) first chip (micron) → still clarifying (remaining typed field, usually diameter)
 curl -s -H 'Content-Type: application/json' \
   -d '{"query":"υδραυλικο φιλτρο","constraints":[{"field":"micron","value":"10"}]}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
+
+# 3b) both chips → single or list (2-turn cap)
+curl -s -H 'Content-Type: application/json' \
+  -d '{"query":"υδραυλικο φιλτρο","constraints":[{"field":"micron","value":"10"},{"field":"diameter","value":"1\""}]}' \
   http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
 
 # 4) junk → empty

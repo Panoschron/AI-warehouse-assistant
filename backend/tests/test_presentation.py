@@ -13,6 +13,7 @@ from backend.core.retrieval.presentation import (
     distinct_typed_values,
     find_exact_code_match,
     majority_family,
+    normalize_constraints,
     restrict_to_family,
     usable_column_diff,
 )
@@ -147,18 +148,14 @@ class PresentationPolicyTests(unittest.TestCase):
         self.assertFalse(decision["empty"])
         self.assertIsNotNone(find_exact_code_match("6205-2RS", matches))
 
-    def test_filter_query_is_clarifying_micron_or_diameter(self):
+    def test_filter_query_is_clarifying_micron(self):
         matches = _filter_grid()
         self.assertLess(matches[0]["score"] - matches[1]["score"], 0.12)
         decision = decide_presentation("υδραυλικο φιλτρο", matches, top_k=5)
         self.assertEqual(decision["presentation"], "clarifying")
         self.assertIsNotNone(decision["clarifying"])
-        self.assertIn(decision["clarifying"]["field"], ("micron", "diameter"))
-        options = decision["clarifying"]["options"]
-        if decision["clarifying"]["field"] == "micron":
-            self.assertEqual(set(options), {"5", "10", "25"})
-        else:
-            self.assertEqual(set(options), {'1/2"', '1"', '1.5"'})
+        self.assertEqual(decision["clarifying"]["field"], "micron")
+        self.assertEqual(set(decision["clarifying"]["options"]), {"5", "10", "25"})
         self.assertFalse(decision["empty"])
         self.assertGreaterEqual(len(decision["matches"]), 2)
 
@@ -221,7 +218,7 @@ class PresentationPolicyTests(unittest.TestCase):
         self.assertTrue(decision["empty"])
         self.assertIsNone(decision["clarifying"])
 
-    def test_constraints_after_chip_are_list_or_single(self):
+    def test_micron_chip_asks_remaining_diameter(self):
         matches = _filter_grid()
         chip = [{"field": "micron", "value": "10"}]
         narrowed = apply_constraints(matches, chip)
@@ -233,17 +230,41 @@ class PresentationPolicyTests(unittest.TestCase):
             narrowed,
             constraints=chip,
         )
-        self.assertIn(decision["presentation"], ("list", "single"))
-        self.assertIsNone(decision["clarifying"])
-        if decision["presentation"] == "list":
-            self.assertGreaterEqual(len(decision["matches"]), 2)
+        self.assertEqual(decision["presentation"], "clarifying")
+        self.assertEqual(decision["clarifying"]["field"], "diameter")
+        self.assertEqual(set(decision["clarifying"]["options"]), {'1/2"', '1"', '1.5"'})
+        self.assertGreaterEqual(len(decision["matches"]), 2)
 
+    def test_both_chips_settle_single_or_list(self):
+        matches = _filter_grid()
         both = [{"field": "micron", "value": "10"}, {"field": "diameter", "value": '1"'}]
         one = apply_constraints(matches, both)
         self.assertEqual(len(one), 1)
         decision = decide_presentation("υδραυλικο φιλτρο", one, constraints=both)
-        self.assertEqual(decision["presentation"], "single")
+        self.assertIn(decision["presentation"], ("single", "list"))
         self.assertIsNone(decision["clarifying"])
+        if decision["presentation"] == "single":
+            self.assertEqual(len(decision["matches"]), 1)
+            self.assertEqual(decision["matches"][0]["catalog"]["micron"], "10")
+            self.assertEqual(decision["matches"][0]["catalog"]["diameter"], '1"')
+
+    def test_unknown_constraint_fields_are_dropped(self):
+        raw = [
+            {"field": "sku_key", "value": "6205-2RS"},
+            {"field": "family", "value": "filter"},
+            {"field": "micron", "value": "10"},
+        ]
+        self.assertEqual(normalize_constraints(raw), [{"field": "micron", "value": "10"}])
+        matches = _filter_grid()
+        untouched = apply_constraints(matches, [{"field": "sku_key", "value": "6205-2RS"}])
+        self.assertEqual(len(untouched), len(matches))
+        decision = decide_presentation(
+            "υδραυλικο φιλτρο",
+            matches,
+            constraints=[{"field": "family", "value": "filter"}],
+        )
+        self.assertEqual(decision["presentation"], "clarifying")
+        self.assertEqual(decision["clarifying"]["field"], "micron")
 
     def test_chips_are_only_micron_or_diameter_never_bearing_fields(self):
         mixed = _filter_grid() + [

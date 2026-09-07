@@ -14,6 +14,9 @@ TYPED_FIELDS: Tuple[Tuple[str, str], ...] = (
     ("diameter", "Διάμετρος"),
 )
 _FIELD_LABELS = {field: label for field, label in TYPED_FIELDS}
+_TYPED_FIELD_KEYS = frozenset(_FIELD_LABELS)
+# One chip per turn, micron then diameter (or remaining typed field).
+MAX_CLARIFYING_CONSTRAINTS = 2
 
 PRESENTATION_SINGLE = "single"
 PRESENTATION_LIST = "list"
@@ -57,21 +60,15 @@ def apply_constraints(
     constraints: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Keep rows whose typed catalog fields equal the submitted chip answers."""
-    if not constraints:
+    normalized = normalize_constraints(constraints)
+    if not normalized:
         return list(matches)
 
     filtered: List[Dict[str, Any]] = []
     for match in matches:
         keep = True
-        for item in constraints:
-            if not isinstance(item, dict):
-                keep = False
-                break
-            field = str(item.get("field") or "").strip()
-            value = item.get("value")
-            if not field or value is None or str(value).strip() == "":
-                keep = False
-                break
+        for item in normalized:
+            field, value = item["field"], item["value"]
             actual = _field_value(match, field)
             if actual is None or _norm_constraint_value(actual) != _norm_constraint_value(value):
                 keep = False
@@ -209,11 +206,13 @@ def decide_presentation(
 ) -> Dict[str, Any]:
     """Apply the locked presentation policy. `matches` are already gated.
 
-    Clarifying is first-turn only. After stateless `constraints` (a chip
-    answer), settle on single or list — do not ask another field.
+    Up to two clarifying turns when the (family-restricted) pool still has a
+    usable typed column-diff and the #1/#2 gap is below PRESENTATION_GAP.
+    After two typed constraints — or when no usable diff remains — settle on
+    single or list.
     """
     list_cap = max(1, min(int(top_k), 5))
-    has_constraints = bool(normalize_constraints(constraints))
+    normalized = normalize_constraints(constraints)
     if not matches:
         return {
             "presentation": PRESENTATION_EMPTY,
@@ -249,7 +248,7 @@ def decide_presentation(
 
     clarifying = (
         usable_column_diff(diff_pool)
-        if (not has_constraints and gap < threshold)
+        if (len(normalized) < MAX_CLARIFYING_CONSTRAINTS and gap < threshold)
         else None
     )
     if clarifying:
@@ -283,6 +282,6 @@ def normalize_constraints(raw: Optional[Iterable[Any]]) -> List[Dict[str, str]]:
         if field is None or value is None:
             continue
         field_s, value_s = str(field).strip(), str(value).strip()
-        if field_s and value_s:
+        if field_s in _TYPED_FIELD_KEYS and value_s:
             out.append({"field": field_s, "value": value_s})
     return out
