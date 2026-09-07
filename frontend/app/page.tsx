@@ -2,60 +2,45 @@
 
 import { useState } from "react";
 import {
-  API_BASE,
-  isCatalogEmpty,
-  parseQueryResponse,
-  type MatchItem,
+  CATALOG_EMPTY_COPY,
+  Avatar,
+  ClarifyingPromptView,
+  EmptyCatalogState,
+  ListResults,
+  SingleResult,
+  SummaryBubble,
+} from "./query-result";
+import {
+  postQuery,
+  resolvePresentationView,
+  type QueryConstraint,
   type QueryResponse,
 } from "@/lib/query";
-
-const LOCATION_EMPTY_COPY = "χωρίς ράφι / δεν υπάρχει τοποθεσία";
-const CATALOG_EMPTY_COPY =
-  "Δεν βρέθηκαν σχετικά είδη στον κατάλογο. Δεν εφευρίσκονται προδιαγραφές ή θέσεις.";
 
 export default function ChatPage() {
   const [input, setInput] = useState("");
   const [lastQuestion, setLastQuestion] = useState("");
+  const [constraints, setConstraints] = useState<QueryConstraint[]>([]);
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function doSend() {
-    if (!input.trim() || loading) return;
+  async function runQuery(
+    question: string,
+    constraints?: QueryConstraint[],
+  ) {
+    if (!question.trim() || loading) return;
 
-    const question = input.trim();
     setLoading(true);
     setError("");
     setResult(null);
-    setLastQuestion(question);
-    setInput("");
 
     try {
-      const res = await fetch(`${API_BASE}/query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: question }),
+      const data = await postQuery({
+        query: question,
+        ...(constraints?.length ? { constraints } : {}),
       });
-
-      let data: unknown = null;
-      try {
-        data = await res.json();
-      } catch {
-        /* ignore non-JSON */
-      }
-
-      if (!res.ok) {
-        const detail =
-          data &&
-          typeof data === "object" &&
-          "detail" in data &&
-          typeof data.detail === "string"
-            ? data.detail
-            : null;
-        throw new Error(detail ?? `HTTP ${res.status}`);
-      }
-
-      setResult(parseQueryResponse(data));
+      setResult(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -63,13 +48,34 @@ export default function ChatPage() {
     }
   }
 
+  async function doSend() {
+    if (!input.trim() || loading) return;
+    const question = input.trim();
+    setLastQuestion(question);
+    setConstraints([]);
+    setInput("");
+    await runQuery(question);
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     await doSend();
   }
 
+  function handleConstraint(value: string) {
+    const field = result?.clarifying?.field?.trim();
+    const query = lastQuestion.trim();
+    if (!field || !query || loading) return;
+    const next = [
+      ...constraints.filter((item) => item.field !== field),
+      { field, value },
+    ];
+    setConstraints(next);
+    void runQuery(query, next);
+  }
+
   const hasConversation = Boolean(lastQuestion || result || error || loading);
-  const emptyCatalog = result ? isCatalogEmpty(result) : false;
+  const view = result ? resolvePresentationView(result) : null;
 
   return (
     <main
@@ -166,8 +172,9 @@ export default function ChatPage() {
                 display: "flex",
                 flexDirection: "column",
                 gap: "12px",
-                maxWidth: "760px",
+                maxWidth: view === "single" ? "100%" : "760px",
                 margin: "0 auto",
+                width: "100%",
               }}
             >
               {lastQuestion && (
@@ -223,36 +230,35 @@ export default function ChatPage() {
                       </SummaryBubble>
                     )}
 
-                    {!loading && !error && result && emptyCatalog && (
+                    {!loading && !error && result && view === "empty" && (
                       <EmptyCatalogState
                         message={result.nl_response || CATALOG_EMPTY_COPY}
                       />
                     )}
 
-                    {!loading && !error && result && !emptyCatalog && (
+                    {!loading && !error && result && view === "clarifying" && (
+                      <ClarifyingPromptView
+                        result={result}
+                        disabled={loading}
+                        onSelect={handleConstraint}
+                      />
+                    )}
+
+                    {!loading && !error && result && view === "single" && result.matches[0] && (
                       <>
                         {result.nl_response && (
                           <SummaryBubble>{result.nl_response}</SummaryBubble>
                         )}
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#4b5563",
-                            paddingLeft: "2px",
-                          }}
-                        >
-                          {result.matches.length}{" "}
-                          {result.matches.length === 1
-                            ? "αποτέλεσμα"
-                            : "αποτελέσματα"}
-                        </div>
-                        {result.matches.map((match, index) => (
-                          <MatchCard
-                            key={`${match.code || "match"}-${index}`}
-                            match={match}
-                          />
-                        ))}
+                        <SingleResult match={result.matches[0]} />
+                      </>
+                    )}
+
+                    {!loading && !error && result && view === "list" && (
+                      <>
+                        {result.nl_response && (
+                          <SummaryBubble>{result.nl_response}</SummaryBubble>
+                        )}
+                        <ListResults matches={result.matches} />
                       </>
                     )}
                   </div>
@@ -317,163 +323,6 @@ export default function ChatPage() {
   );
 }
 
-function Avatar() {
-  return (
-    <div
-      style={{
-        width: "28px",
-        height: "28px",
-        borderRadius: "999px",
-        backgroundColor: "#e5e7eb",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "14px",
-        color: "#4b5563",
-        flexShrink: 0,
-      }}
-    >
-      A
-    </div>
-  );
-}
-
-function SummaryBubble({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        padding: "10px 14px",
-        borderRadius: "18px",
-        backgroundColor: "#ffffff",
-        color: "#111827",
-        fontSize: "14px",
-        whiteSpace: "pre-wrap",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
-        borderBottomLeftRadius: "4px",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function EmptyCatalogState({ message }: { message: string }) {
-  return (
-    <div
-      style={{
-        padding: "16px 16px 14px",
-        borderRadius: "12px",
-        backgroundColor: "#fffbeb",
-        border: "1px solid #fde68a",
-        color: "#78350f",
-      }}
-    >
-      <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>
-        Κενό αποτέλεσμα καταλόγου
-      </div>
-      <div style={{ fontSize: "14px", lineHeight: 1.45 }}>{message}</div>
-    </div>
-  );
-}
-
-function MatchCard({ match }: { match: MatchItem }) {
-  const shelfPresent =
-    match.location_state === "present" && Boolean(match.location);
-
-  return (
-    <article
-      style={{
-        padding: "12px 14px",
-        borderRadius: "12px",
-        backgroundColor: "#ffffff",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "6px",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: "13px",
-            fontWeight: 700,
-            color: "#1e3a8a",
-            backgroundColor: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            borderRadius: "6px",
-            padding: "2px 8px",
-          }}
-        >
-          {match.code || "—"}
-        </span>
-        <span style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
-          {match.description || "Χωρίς περιγραφή"}
-        </span>
-      </div>
-
-      {match.explain && (
-        <p
-          style={{
-            margin: "0 0 10px",
-            fontSize: "13px",
-            lineHeight: 1.5,
-            color: "#374151",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {match.explain}
-        </p>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          fontSize: "12px",
-        }}
-      >
-        <span style={{ fontWeight: 700, color: "#6b7280" }}>Ράφι</span>
-        {shelfPresent ? (
-          <span
-            style={{
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              fontWeight: 600,
-              color: "#065f46",
-              backgroundColor: "#ecfdf5",
-              border: "1px solid #a7f3d0",
-              borderRadius: "6px",
-              padding: "2px 8px",
-            }}
-          >
-            {match.location}
-          </span>
-        ) : (
-          <span
-            style={{
-              color: "#92400e",
-              backgroundColor: "#fffbeb",
-              border: "1px solid #fde68a",
-              borderRadius: "6px",
-              padding: "2px 8px",
-            }}
-          >
-            {LOCATION_EMPTY_COPY}
-          </span>
-        )}
-      </div>
-    </article>
-  );
-}
-
 function LandingHints() {
   const hints = [
     {
@@ -485,8 +334,8 @@ function LandingHints() {
       body: "«ρουλεμαν 6205» — αν δεν υπάρχει θέση, φαίνεται ρητά.",
     },
     {
-      title: "🗂️ Κενός κατάλογος",
-      body: "Άσχετο ερώτημα → σαφές empty state, χωρίς εφεύρεση ειδών.",
+      title: "💬 Διευκρίνιση",
+      body: "Αν το ερώτημα είναι ασαφές, εμφανίζονται επιλογές (chips) από τον κατάλογο.",
     },
   ];
 
