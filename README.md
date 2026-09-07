@@ -185,10 +185,11 @@ npm run dev
     - `nl_response` is optional (short summary bubble in the chat UI)
   - Presentation policy (after existing junk / score gates):
     - exact catalog code (`code` / `sku_key` / `size`, e.g. `6205-2RS`) **or** (leader_ok and gap ≥ 0.12) → `single`, `matches` = [#1] only
-    - else if usable column-diff and gap < 0.12 → `clarifying` (one field per turn; resubmit the same query with `constraints`)
+    - else if no `constraints` yet and usable column-diff (`micron` / `diameter` only) and gap < 0.12 → `clarifying`
     - else if matches → `list` (2–5)
     - else → `empty`
-    - Soft family filter: before column-diff, if a majority of top-M share `family`, restrict the diff (and clarifying matches) to that family so filter queries do not emit bearing chips
+    - After a chip (`constraints` present): never clarifying — settle on `single` or `list` (stateless resubmit)
+    - Soft family filter: before column-diff, if a majority of top-M share `family`, restrict the diff to that family. Chips are only typed `micron` / `diameter` of that family — never bearing `size` / `sku_key`
   - Errors:
     - 400 Bad Request: empty query or top_k <= 0
     - 503 Service Unavailable: when pipeline is not initialized
@@ -201,38 +202,40 @@ curl -s -H 'Content-Type: application/json' \
   http://127.0.0.1:8000/query | jq
 ```
 
-### 10′ smoke test
+### Merge-gate smoke (copy-paste)
 
-Rebuild the index after catalog edits, then:
+Rebuild the index after catalog edits, then start the API:
 
 ```bash
 python -m backend.scripts.build_demo_index
 uvicorn backend.server:app --reload --host 127.0.0.1 --port 8000
+```
 
-# exact bearing code → presentation=single, one match (sku_key 6205-2RS)
+```bash
+# 1) exact code → single, one match, explain + location
 curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"6205-2RS","top_k":5}' \
-  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code],n:(.matches|length)}'
+  -d '{"query":"6205-2RS"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,n:(.matches|length),match:(.matches[0]|{code,description,explain,location,location_state})}'
 
-# filter misspelling → presentation=clarifying, micron or diameter options from the grid
+# 2) filter query → clarifying; chips ONLY micron/diameter of family=filter (must NOT be list)
 curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"υδραυλικο φιλτρο","top_k":5}' \
+  -d '{"query":"υδραυλικο φιλτρο"}' \
   http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
 
-# chip answer (stateless) → constraints narrow the same query
+# 3) same query + chip constraint → single or list (stateless; not a second clarifying)
 curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"υδραυλικο φιλτρο","top_k":5,"constraints":[{"field":"micron","value":"10"}]}' \
+  -d '{"query":"υδραυλικο φιλτρο","constraints":[{"field":"micron","value":"10"}]}' \
   http://127.0.0.1:8000/query | jq '{presentation,empty,clarifying,codes:[.matches[].code]}'
 
-# junk → presentation=empty, matches []
+# 4) junk → empty
 curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"zzzznotaproduct999","top_k":3}' \
+  -d '{"query":"zzzznotaproduct999"}' \
   http://127.0.0.1:8000/query | jq '{presentation,empty,matches,clarifying}'
 
-# item with no shelf still reports location null / empty:
+# 5) no cross-family chip pollution (options ⊆ {5,10,25} or {1/2",1",1.5"} — never 6205-2RS)
 curl -s -H 'Content-Type: application/json' \
-  -d '{"query":"ρουλεμαν 6205","top_k":3}' \
-  http://127.0.0.1:8000/query | jq
+  -d '{"query":"υδραυλικο φιλτρο"}' \
+  http://127.0.0.1:8000/query | jq '{presentation,field:.clarifying.field,options:.clarifying.options}'
 ```
 
 Offline unit proof (no FAISS): `python -m unittest backend.tests.test_presentation backend.tests.test_demo_slice`

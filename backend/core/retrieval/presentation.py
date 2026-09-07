@@ -7,11 +7,11 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from backend import app_settings
 from backend.core.retrieval.match_builder import _fold
 
-# Typed catalog columns used for column-diff chips. Options are never invented.
+# Chip fields only. Soft family filter uses `family` but never emits it as a chip
+# (avoids cross-family pollution: no bearing size/sku in filter clarifying).
 TYPED_FIELDS: Tuple[Tuple[str, str], ...] = (
     ("micron", "Micron"),
     ("diameter", "Διάμετρος"),
-    ("family", "Οικογένεια"),
 )
 _FIELD_LABELS = {field: label for field, label in TYPED_FIELDS}
 
@@ -205,9 +205,15 @@ def decide_presentation(
     query: str,
     matches: List[Dict[str, Any]],
     top_k: int = 5,
+    constraints: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Apply the locked presentation policy. `matches` are already gated."""
+    """Apply the locked presentation policy. `matches` are already gated.
+
+    Clarifying is first-turn only. After stateless `constraints` (a chip
+    answer), settle on single or list — do not ask another field.
+    """
     list_cap = max(1, min(int(top_k), 5))
+    has_constraints = bool(normalize_constraints(constraints))
     if not matches:
         return {
             "presentation": PRESENTATION_EMPTY,
@@ -241,7 +247,11 @@ def decide_presentation(
     if not diff_pool:
         diff_pool = list(top_m)
 
-    clarifying = usable_column_diff(diff_pool) if gap < threshold else None
+    clarifying = (
+        usable_column_diff(diff_pool)
+        if (not has_constraints and gap < threshold)
+        else None
+    )
     if clarifying:
         shown = diff_pool[:list_cap]
         return {

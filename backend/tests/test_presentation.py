@@ -221,24 +221,46 @@ class PresentationPolicyTests(unittest.TestCase):
         self.assertTrue(decision["empty"])
         self.assertIsNone(decision["clarifying"])
 
-    def test_constraints_narrow_to_micron_then_diameter(self):
+    def test_constraints_after_chip_are_list_or_single(self):
         matches = _filter_grid()
-        narrowed = apply_constraints(matches, [{"field": "micron", "value": "10"}])
+        chip = [{"field": "micron", "value": "10"}]
+        narrowed = apply_constraints(matches, chip)
         self.assertTrue(narrowed)
         self.assertTrue(all(m["catalog"]["micron"] == "10" for m in narrowed))
         self.assertLess(len(narrowed), len(matches))
-        decision = decide_presentation("υδραυλικο φιλτρο", narrowed)
-        self.assertEqual(decision["presentation"], "clarifying")
-        self.assertEqual(decision["clarifying"]["field"], "diameter")
-        self.assertEqual(set(decision["clarifying"]["options"]), {'1/2"', '1"', '1.5"'})
-
-        both = apply_constraints(
-            matches,
-            [{"field": "micron", "value": "10"}, {"field": "diameter", "value": '1"'}],
+        decision = decide_presentation(
+            "υδραυλικο φιλτρο",
+            narrowed,
+            constraints=chip,
         )
-        self.assertEqual(len(both), 1)
-        decision = decide_presentation("υδραυλικο φιλτρο", both)
+        self.assertIn(decision["presentation"], ("list", "single"))
+        self.assertIsNone(decision["clarifying"])
+        if decision["presentation"] == "list":
+            self.assertGreaterEqual(len(decision["matches"]), 2)
+
+        both = [{"field": "micron", "value": "10"}, {"field": "diameter", "value": '1"'}]
+        one = apply_constraints(matches, both)
+        self.assertEqual(len(one), 1)
+        decision = decide_presentation("υδραυλικο φιλτρο", one, constraints=both)
         self.assertEqual(decision["presentation"], "single")
+        self.assertIsNone(decision["clarifying"])
+
+    def test_chips_are_only_micron_or_diameter_never_bearing_fields(self):
+        mixed = _filter_grid() + [
+            _match(
+                "10.05.00501",
+                "Ρουλεμάν 6205-2RS",
+                0.69,
+                family="bearing",
+                sku_key="6205-2RS",
+                size="6205-2RS",
+            )
+        ]
+        decision = decide_presentation("υδραυλικο φιλτρο", mixed)
+        self.assertEqual(decision["presentation"], "clarifying")
+        self.assertIn(decision["clarifying"]["field"], ("micron", "diameter"))
+        forbidden = {"6205-2RS", "6308-2RS", "bearing", "filter", "family"}
+        self.assertTrue(forbidden.isdisjoint(decision["clarifying"]["options"]))
 
     def test_empty_diameter_rows_drop_out_of_diameter_constraint(self):
         matches = _filter_grid() + [

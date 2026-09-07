@@ -62,11 +62,17 @@ class QueryPipeline:
         logger.info(f"Processing query: {query}")
 
         results, processed_query = self.search(query, top_k=top_k)
+        normalized = normalize_constraints(constraints)
         gated = apply_constraints(
             build_matches(results, query=processed_query),
-            normalize_constraints(constraints),
+            normalized,
         )
-        decision = decide_presentation(query=query, matches=gated, top_k=top_k)
+        decision = decide_presentation(
+            query=query,
+            matches=gated,
+            top_k=top_k,
+            constraints=normalized,
+        )
         matches = attach_explains(
             query=query,
             matches=decision["matches"],
