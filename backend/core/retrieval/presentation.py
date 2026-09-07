@@ -142,8 +142,25 @@ def restrict_to_family(
     return [m for m in matches if _field_value(m, "family") == family]
 
 
+_DIAMETER_ORDER = {'1/2"': 0, '1"': 1, '1.5"': 2}
+
+
+def _sort_typed_values(field: str, values: List[str]) -> List[str]:
+    if field == "micron":
+        def micron_key(value: str) -> Tuple[int, float, str]:
+            try:
+                return (0, float(value), value)
+            except ValueError:
+                return (1, 0.0, value)
+
+        return sorted(values, key=micron_key)
+    if field == "diameter":
+        return sorted(values, key=lambda value: (_DIAMETER_ORDER.get(value, 99), value))
+    return values
+
+
 def distinct_typed_values(matches: Sequence[Dict[str, Any]], field: str) -> List[str]:
-    """Preserve first-seen order; skip empty / partial ERP values."""
+    """First-seen unique values, then a stable demo order. Skip empty ERP cells."""
     values: List[str] = []
     seen = set()
     for match in matches:
@@ -155,7 +172,7 @@ def distinct_typed_values(matches: Sequence[Dict[str, Any]], field: str) -> List
             continue
         seen.add(key)
         values.append(value)
-    return values
+    return _sort_typed_values(field, values)
 
 
 def usable_column_diff(
