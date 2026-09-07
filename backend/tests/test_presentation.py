@@ -173,7 +173,7 @@ class PresentationPolicyTests(unittest.TestCase):
         self.assertEqual(set(clarifying["options"]), {'1/2"', '1"', '1.5"'})
 
     def test_family_filter_excludes_bearing_from_micron_chips(self):
-        matches = _filter_grid()[:6] + [
+        matches = _filter_grid() + [
             _match(
                 "10.05.00501",
                 "Ρουλεμάν 6205-2RS",
